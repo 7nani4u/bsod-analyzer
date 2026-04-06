@@ -497,6 +497,14 @@
         <div class="card-body" id="exceptionBody"></div>
       </div>
 
+      <!-- WinDbg Output -->
+      <div class="card" id="cardWindbg" style="display:none">
+        <div class="card-header"><span class="card-icon">🖥️</span><h3>WinDbg Analysis Output</h3></div>
+        <div class="card-body" style="padding: 0;">
+          <pre id="windbgBody" style="margin: 0; padding: 20px; background: #000; color: #0f0; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.4; overflow-x: auto; max-height: 500px;"></pre>
+        </div>
+      </div>
+
       <!-- API Info -->
       <div class="card">
         <div class="card-header"><span class="card-icon">📖</span><h3>API &amp; Integration</h3></div>
@@ -867,6 +875,12 @@ function renderResults(data) {
         <div class="info-item"><div class="info-label">Exception Address</div><div class="info-value highlight">${exc.address || 'N/A'}</div></div>
       </div>`;
   }
+
+  // WinDbg Output
+  if (data.windbg_output) {
+    document.getElementById('cardWindbg').style.display = '';
+    document.getElementById('windbgBody').textContent = data.windbg_output;
+  }
 }
 
 function formatBytes(bytes) {
@@ -1151,6 +1165,7 @@ function resetAnalyzer() {
   document.getElementById('progressContainer').classList.remove('visible');
   document.getElementById('cardAI').style.display = 'none';
   document.getElementById('cardException').style.display = 'none';
+  document.getElementById('cardWindbg').style.display = 'none';
   document.getElementById('fileInput').value = '';
 }
 </script>

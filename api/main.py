@@ -297,6 +297,7 @@ def format_analysis_response(raw: dict, filename: str) -> dict:
             "known_causes": raw.get("known_causes", []),
             "suggested_fixes": raw.get("suggested_fixes", []),
         },
+        "windbg_output": raw.get("windbg_output", ""),
         "errors": raw.get("errors", []),
     }
 
