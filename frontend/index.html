@@ -283,7 +283,7 @@
       padding: 16px;
     }
     .driver-name { font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .driver-badge { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; font-family: 'Inter', sans-serif; border: 1px solid rgba(239, 68, 68, 0.2); }
+    .driver-badge { background: var(--bg-primary); color: var(--text-secondary); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; font-family: 'Inter', sans-serif; border: 1px solid var(--border); }
     .driver-desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px; }
     .driver-tip { color: var(--accent-blue); font-size: 0.85rem; }
     
@@ -305,7 +305,7 @@
     .ai-col-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: #06b6d4;
+      color: #3b82f6;
       margin-bottom: 16px;
     }
     .ai-col-content {
@@ -644,20 +644,22 @@
 
           <!-- AI Output Section -->
           <div id="aiResult">
-            <!-- 핵심 원인별 영향도 분석 (Impact Analysis by Root Cause) -->
-            <div id="aiRootCauses" style="margin-top: 32px; margin-bottom: 32px; display: none;">
-              <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">핵심 원인별 영향도 분석</h3>
-              <div id="rootCauseList" style="display: flex; flex-direction: column; gap: 24px;"></div>
+            
+            <!-- Problematic Drivers Section -->
+            <div id="aiProblematicDriversContainer" style="display: none;">
+              <div class="driver-card">
+                <div class="driver-header">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  Known Problematic Drivers Detected
+                </div>
+                <div id="aiProblematicDriversList"></div>
+              </div>
             </div>
 
-            <!-- 추가 분석 권고 (Additional Analysis Recommendations) -->
-            <div id="aiRecommendationsExt" style="margin-bottom: 32px; display: none;">
-              <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">추가 분석 권고</h3>
-              <div id="valAiRecs" style="display: flex; flex-direction: column; gap: 8px; color: #f1f5f9; line-height: 1.6;"></div>
-            </div>
-
+            <!-- Summary Text -->
             <div class="ai-summary-text" id="aiSummary" style="display: none;"></div>
 
+            <!-- 2-column Legacy -->
             <div class="ai-cols" id="aiLegacyCols" style="display: none;">
               <div>
                 <div class="ai-col-title">Probable Cause</div>
@@ -967,26 +969,16 @@ function renderHeuristicInsights(data) {
   document.getElementById('valAiThirdParty').innerText = data.third_party_intervention || 'N/A';
 
   const causes = data.root_cause_analysis || [];
-  if (causes.length > 0) {
-    document.getElementById('aiRootCauses').style.display = 'block';
-    document.getElementById('rootCauseList').innerHTML = causes.map(c => `
-      <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #1e293b;">
-        <div style="margin-bottom: 12px;">
-          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">원인 항목</div>
-          <div style="color: #f1f5f9; font-weight: 600;">${c.cause || 'Unknown'}</div>
-        </div>
-        <div>
-          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">주요 관련 드라이버/징후</div>
-          <div style="color: #f1f5f9; line-height: 1.5;">${c.details || 'N/A'}</div>
-        </div>
-      </div>
-    `).join('');
-  }
-
   const recs = data.additional_analysis_recommendations || data.diagnosis?.suggested_fixes || [];
-  if (recs.length > 0) {
-    document.getElementById('aiRecommendationsExt').style.display = 'block';
-    document.getElementById('valAiRecs').innerHTML = recs.map(r => `<div>${r}</div>`).join('');
+  
+  if (causes.length > 0 || recs.length > 0) {
+    document.getElementById('aiLegacyCols').style.display = 'grid';
+    if (causes.length > 0) {
+      document.getElementById('aiCause').innerHTML = causes.map(c => `<b>${c.cause || 'Unknown'}</b>: ${c.details || 'N/A'}`).join('<br><br>');
+    }
+    if (recs.length > 0) {
+      document.getElementById('aiRecommendations').innerHTML = '<ul>' + recs.map(r => `<li>${r}</li>`).join('') + '</ul>';
+    }
   }
 }
 
@@ -1085,14 +1077,15 @@ async function runAIDiagnosis() {
     const systemPrompt = `You are a senior Windows kernel crash dump analysis expert.
 Analyze the provided crash dump data and return ONLY a valid JSON object.
 Rules:
-1. "lay_summary": 1-2 sentences summarizing the crash (Korean).
-2. "failure_bucket": The bugcheck and module (e.g., "BREAKPOINT_80000003_twinapi.appcore.dll!Event::WaitWithFreeUnusedLibraries")
-3. "faulting_thread": Thread ID (e.g., "FAULTING_THREAD: 00004f74")
-4. "stack_summary": High-level trace (e.g., "NtWaitForMultipleObjects -> KERNELBASE!...")
-5. "third_party_modules": List of suspicious third-party DLLs/sys (e.g., "f_nxa.dll, f_nxacc.dll 등 Fasoo DRM 다수 로드")
-6. "root_causes": Array of objects, each with "cause" (string) and "details" (string explaining driver/module signs). Max 2 items.
-7. "recommendations": Array of strings (e.g., "추가 로그 : Application, System", "추가 비교 : ...")
-Respond in Korean (한국어)`;
+1. "failure_bucket": The bugcheck and module (e.g., "BREAKPOINT_80000003_twinapi.appcore.dll!Event::WaitWithFreeUnusedLibraries")
+2. "faulting_thread": Thread ID (e.g., "FAULTING_THREAD: 00004f74")
+3. "stack_summary": High-level trace (e.g., "NtWaitForMultipleObjects -> KERNELBASE!...")
+4. "third_party_modules": List of suspicious third-party DLLs/sys
+5. "problematic_drivers": Array of objects. Each object must have "name" (e.g. "TSFltDrv.sys"), "badge" (e.g. "security", "network", "system"), "vendor" (e.g. "AhnLab V3 Filter Driver"), "description" (bullet point text explaining the issue), "tip" (actionable tip text). If no driver is found, return empty array.
+6. "summary_text": A 1-2 sentence italicized summary explaining the crash simply.
+7. "probable_cause": A detailed paragraph explaining the root cause.
+8. "recommendations": Array of strings with actionable recommendations.
+Respond in Korean (한국어), but keep technical terms and driver names in English.`;
 
     const userPrompt = `Analyze this Windows crash:
 - Bug Check: ${crash.bugcheck_code} (${crash.bugcheck_name})
@@ -1100,7 +1093,7 @@ Respond in Korean (한국어)`;
 - OS: ${sysInfo.os_version || 'Unknown'}
 - Modules: ${modules.map(m => m.name).join(', ')}
 
-Return JSON with keys: lay_summary, failure_bucket, faulting_thread, stack_summary, third_party_modules, root_causes, recommendations`;
+Return JSON with keys: failure_bucket, faulting_thread, stack_summary, third_party_modules, problematic_drivers, summary_text, probable_cause, recommendations`;
 
     const response = await puter.ai.chat(userPrompt, { model: 'gpt-4o-mini', systemPrompt });
     clearInterval(interval);
@@ -1139,29 +1132,35 @@ function renderAIResult(ai) {
   document.getElementById('valAiStack').innerText = ai.stack_summary || 'N/A';
   document.getElementById('valAiThirdParty').innerText = ai.third_party_modules || 'N/A';
   
-  // 핵심 원인별 영향도 분석
-  const causes = ai.root_causes || [];
-  if (causes.length > 0) {
-    document.getElementById('aiRootCauses').style.display = 'block';
-    document.getElementById('rootCauseList').innerHTML = causes.map(c => `
-      <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #1e293b;">
-        <div style="margin-bottom: 12px;">
-          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">원인 항목</div>
-          <div style="color: #f1f5f9; font-weight: 600;">${c.cause || 'Unknown'}</div>
-        </div>
-        <div>
-          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">주요 관련 드라이버/징후</div>
-          <div style="color: #f1f5f9; line-height: 1.5;">${c.details || 'N/A'}</div>
-        </div>
+  // Problematic Drivers Section
+  const drivers = ai.problematic_drivers || [];
+  if (drivers.length > 0) {
+    document.getElementById('aiProblematicDriversContainer').style.display = 'block';
+    document.getElementById('aiProblematicDriversList').innerHTML = drivers.map(d => `
+      <div class="driver-item">
+        <div class="driver-name">${d.name || 'Unknown'} <span class="driver-badge">${d.badge || 'driver'}</span></div>
+        <div class="driver-desc">${d.vendor || ''}</div>
+        <div class="driver-desc" style="color:var(--text-primary);">• ${d.description || ''}</div>
+        <div class="driver-tip">Tip: ${d.tip || ''}</div>
       </div>
     `).join('');
   }
 
-  // 추가 분석 권고
-  const recs = ai.recommendations || [];
-  if (recs.length > 0) {
-    document.getElementById('aiRecommendationsExt').style.display = 'block';
-    document.getElementById('valAiRecs').innerHTML = recs.map(r => `<div>${r}</div>`).join('');
+  // Summary text
+  if (ai.summary_text) {
+    const sumEl = document.getElementById('aiSummary');
+    sumEl.style.display = 'block';
+    sumEl.innerText = `"...${ai.summary_text}"`;
+  }
+
+  // 2-column Cause and Recommendations
+  if (ai.probable_cause || (ai.recommendations && ai.recommendations.length > 0)) {
+    document.getElementById('aiLegacyCols').style.display = 'grid';
+    document.getElementById('aiCause').innerText = ai.probable_cause || 'N/A';
+    const recs = ai.recommendations || [];
+    document.getElementById('aiRecommendations').innerHTML = recs.length > 0 
+      ? '<ul>' + recs.map(r => `<li>${r}</li>`).join('') + '</ul>'
+      : 'N/A';
   }
 }
 
@@ -1215,9 +1214,9 @@ Rules:
 - 심각도: ${crash.severity}
 - OS: ${sysInfo.os_version || 'Unknown'}
 - 원인 드라이버: ${crash.caused_by_driver || '알 수 없음'}
-- AI 근본 원인: ${ai.root_cause || crash.bugcheck_description || '분석 중'}
-- AI 요약: ${ai.lay_summary || ''}
-- 권장 조치: ${(ai.prioritized_fixes || currentAnalysis.diagnosis?.suggested_fixes || []).slice(0,4).join('; ')}
+- AI 근본 원인: ${ai.probable_cause || crash.bugcheck_description || '분석 중'}
+- AI 요약: ${ai.summary_text || ''}
+- 권장 조치: ${(ai.recommendations || currentAnalysis.diagnosis?.suggested_fixes || []).slice(0,4).join('; ')}
 - 비즈니스 영향: ${ai.estimated_impact || '시스템 불안정'}
 
 수신자: ${customer} ${contact}
@@ -1329,6 +1328,9 @@ function resetAnalyzer() {
   currentAnalysis = null; currentAIDiagnosis = null;
   document.getElementById('resultsSection').classList.remove('visible');
   document.getElementById('progressContainer').classList.remove('visible');
+  document.getElementById('aiProblematicDriversContainer').style.display = 'none';
+  document.getElementById('aiSummary').style.display = 'none';
+  document.getElementById('aiLegacyCols').style.display = 'none';
   document.getElementById('fileInput').value = '';
 }
 </script>
