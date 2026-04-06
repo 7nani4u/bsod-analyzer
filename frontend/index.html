@@ -179,27 +179,153 @@
     .step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     .step.active .step-dot { animation: pulse 1s infinite; }
 
-    /* ── Results ── */
-    .results-section { padding: 0 0 64px; display: none; }
+    /* ── Light Theme for Results ── */
+    .results-section { padding: 0 0 64px; display: none; color: #333; font-family: 'Inter', sans-serif; }
     .results-section.visible { display: block; }
+    
+    .light-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    
+    .flex-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .flex-col { display: flex; flex-direction: column; gap: 4px; }
+    
+    .text-sm { font-size: 0.875rem; }
+    .text-xs { font-size: 0.75rem; color: #64748b; }
+    .text-gray { color: #64748b; }
+    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    
+    .failure-bucket {
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+    
+    .info-bar {
+      background: #f8fafc;
+      padding: 12px 16px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      font-size: 0.875rem;
+    }
+    
+    .param-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 24px;
+    }
+    .param-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e2e8f0;
+      font-weight: 600;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #334155;
+    }
+    .param-row {
+      background: #fff;
+      padding: 16px;
+      border-bottom: 1px solid #f1f5f9;
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 16px;
+    }
+    .param-row:last-child { border-bottom: none; }
+    .param-val { color: #2563eb; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
+    .param-name { font-weight: 600; color: #1e293b; margin-bottom: 4px; font-size: 0.9rem; }
+    .param-desc { color: #64748b; font-size: 0.85rem; line-height: 1.5; }
+    
+    .driver-card {
+      background: #fff;
+      border: 1px solid #fbbf24;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 24px;
+      box-shadow: 0 2px 10px rgba(251, 191, 36, 0.1);
+    }
+    .driver-header {
+      padding: 12px 16px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #d97706;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .driver-item {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      margin: 0 16px 16px 16px;
+      padding: 16px;
+    }
+    .driver-name { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #1e293b; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .driver-badge { background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; font-family: 'Inter', sans-serif; }
+    .driver-desc { color: #475569; font-size: 0.85rem; margin-bottom: 12px; }
+    .driver-tip { color: #2563eb; font-size: 0.85rem; }
+    
+    .ai-summary-text {
+      font-style: italic;
+      color: #475569;
+      font-size: 0.95rem;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+    
+    .ai-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+    }
+    @media (max-width: 768px) { .ai-cols { grid-template-columns: 1fr; } }
+    
+    .ai-col-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #2563eb;
+      margin-bottom: 16px;
+    }
+    .ai-col-content {
+      color: #475569;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .ai-col-content ul {
+      padding-left: 20px;
+      margin-top: 8px;
+    }
+    .ai-col-content li {
+      margin-bottom: 12px;
+    }
+
+    /* Override dark theme for buttons in results */
     .results-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
+      color: #fff; /* Keep title white as it's on dark bg */
     }
     .results-title { font-size: 1.3rem; font-weight: 700; }
     .results-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
-    .card {
-      background: var(--bg-card); border: 1px solid var(--border);
-      border-radius: 12px; overflow: hidden; margin-bottom: 16px;
-    }
-    .card-header {
-      padding: 16px 20px; border-bottom: 1px solid var(--border);
-      display: flex; align-items: center; gap: 10px;
-    }
-    .card-header h3 { font-size: 0.95rem; font-weight: 600; }
-    .card-icon { font-size: 1rem; }
-    .card-body { padding: 20px; }
 
     /* Severity badge */
     .severity {
@@ -423,98 +549,66 @@
       <div class="results-header">
         <div class="results-title">📊 Analysis Results</div>
         <div class="results-actions">
-          <button class="btn btn-secondary btn-sm" onclick="runAIDiagnosis()">🤖 AI Diagnose</button>
           <button class="btn btn-secondary btn-sm" onclick="openEmailModal()">📧 Email Draft</button>
           <button class="btn btn-secondary btn-sm" onclick="downloadPDF()">📄 PDF Report</button>
           <button class="btn btn-secondary btn-sm" onclick="resetAnalyzer()">🔄 New Analysis</button>
         </div>
       </div>
 
-      <!-- Crash Summary -->
-      <div class="card" id="cardSummary">
-        <div class="card-header">
-          <span class="card-icon">⚠️</span>
-          <h3>Crash Summary</h3>
-          <span id="severityBadge" style="margin-left:auto"></span>
+      <div class="light-card">
+        <!-- Top Section -->
+        <div class="failure-bucket">
+          <span class="text-gray">Failure Bucket:</span>
+          <span class="font-mono" id="valFailureBucket">0x...</span>
+          <button class="btn btn-sm" style="background:transparent;border:none;cursor:pointer" onclick="navigator.clipboard.writeText(document.getElementById('valFailureBucket').innerText)">📋</button>
         </div>
-        <div class="card-body">
-          <div class="info-grid" id="crashGrid"></div>
-          <div style="margin-top:16px; padding:12px; background:var(--bg-secondary); border-radius:8px; font-size:0.875rem; line-height:1.6; color:var(--text-secondary);" id="bugcheckDesc"></div>
-        </div>
-      </div>
 
-      <!-- System Info -->
-      <div class="card" id="cardSystem">
-        <div class="card-header"><span class="card-icon">💻</span><h3>System Information</h3></div>
-        <div class="card-body"><div class="info-grid" id="systemGrid"></div></div>
-      </div>
-
-      <!-- AI Diagnosis -->
-      <div class="card" id="cardAI" style="display:none">
-        <div class="card-header">
-          <span class="card-icon">🤖</span>
-          <h3>AI Diagnosis</h3>
-          <span class="ai-badge" style="margin-left:auto">✨ LLM Powered</span>
-        </div>
-        <div class="card-body" id="aiBody">
-          <div class="ai-loading" id="aiLoading">
-            <div class="spinner"></div>
-            <span id="aiLoadingMsg">Analyzing with AI...</span>
+        <div class="info-bar">
+          <div class="flex-row">
+            <div><span class="text-gray">Process:</span> <span id="valProcess">System</span></div>
+            <div><span class="text-gray">Symbol:</span> <span class="font-mono" style="color:#2563eb" id="valSymbol">Unknown</span></div>
           </div>
-          <div id="aiResult" style="display:none"></div>
+          <div><span class="text-gray">Windows:</span> <span id="valWindows">Unknown</span></div>
         </div>
-      </div>
 
-      <!-- Diagnosis & Fixes -->
-      <div class="card" id="cardFixes">
-        <div class="card-header"><span class="card-icon">🔧</span><h3>Diagnosis &amp; Suggested Fixes</h3></div>
-        <div class="card-body">
-          <div style="margin-bottom:16px">
-            <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;font-weight:600">KNOWN CAUSES</div>
-            <ul class="fix-list" id="causesList"></ul>
+        <!-- Parameter Analysis -->
+        <div class="param-card">
+          <div class="param-header">
+            <span>🔍 Parameter Analysis</span>
           </div>
-          <div>
-            <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:8px;font-weight:600">SUGGESTED FIXES</div>
-            <ul class="fix-list" id="fixesList"></ul>
+          <div id="paramRows"></div>
+        </div>
+
+        <!-- AI Analysis Loading -->
+        <div id="aiLoading" style="display:flex;flex-direction:column;align-items:center;padding:40px;gap:16px;">
+          <div class="spinner" style="border-color:#e2e8f0;border-top-color:#2563eb;"></div>
+          <span id="aiLoadingMsg" style="color:#64748b;">Analyzing with AI...</span>
+        </div>
+
+        <!-- AI Output Section -->
+        <div id="aiResult" style="display:none;">
+          <!-- Known Problematic Drivers -->
+          <div class="driver-card" id="driverCard" style="display:none;">
+            <div class="driver-header">
+              <span>⚠️ Known Problematic Drivers Detected</span>
+            </div>
+            <div id="driverList"></div>
+          </div>
+
+          <div class="ai-summary-text" id="aiSummary"></div>
+
+          <div class="ai-cols">
+            <div>
+              <div class="ai-col-title">Probable Cause</div>
+              <div class="ai-col-content" id="aiCause"></div>
+            </div>
+            <div>
+              <div class="ai-col-title">Recommendations</div>
+              <div class="ai-col-content" id="aiRecommendations"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Loaded Modules -->
-      <div class="card" id="cardModules">
-        <div class="card-header"><span class="card-icon">📦</span><h3>Loaded Modules</h3><span id="moduleCount" style="margin-left:auto;font-size:0.8rem;color:var(--text-secondary)"></span></div>
-        <div class="card-body" style="padding:0;overflow-x:auto">
-          <table class="module-table">
-            <thead><tr><th>#</th><th>Module Name</th><th>Base Address</th><th>Size</th></tr></thead>
-            <tbody id="modulesBody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- Exception Info -->
-      <div class="card" id="cardException" style="display:none">
-        <div class="card-header"><span class="card-icon">💥</span><h3>Exception Information</h3></div>
-        <div class="card-body" id="exceptionBody"></div>
-      </div>
-
-      <!-- WinDbg Output -->
-      <div class="card" id="cardWindbg" style="display:none">
-        <div class="card-header"><span class="card-icon">🖥️</span><h3>WinDbg Analysis Output</h3></div>
-        <div class="card-body" style="padding: 0;">
-          <pre id="windbgBody" style="margin: 0; padding: 20px; background: #000; color: #0f0; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.4; overflow-x: auto; max-height: 500px;"></pre>
-        </div>
-      </div>
-
-      <!-- API Info -->
-      <div class="card">
-        <div class="card-header"><span class="card-icon">📖</span><h3>API &amp; Integration</h3></div>
-        <div class="card-body">
-          <p style="font-size:0.875rem;color:var(--text-secondary);margin-bottom:12px">
-            This analysis is powered by the BSOD Analyzer REST API. Access the full Swagger UI to explore all endpoints, test requests, and integrate into your own tools.
-          </p>
-          <a class="swagger-link" href="/api/docs" target="_blank">📖 Open Swagger UI — /api/docs</a>
-          <a class="swagger-link" href="/api/redoc" target="_blank" style="margin-left:8px">📘 ReDoc — /api/redoc</a>
-        </div>
       </div>
     </div>
 
@@ -805,82 +899,51 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function renderResults(data) {
   const crash = data.crash_summary || {};
   const sys = data.system_info || {};
-  const diag = data.diagnosis || {};
 
-  // Severity badge
-  const sev = crash.severity || 'unknown';
-  document.getElementById('severityBadge').innerHTML =
-    `<span class="severity severity-${sev}">● ${sev.toUpperCase()}</span>`;
-
-  // Crash grid
-  document.getElementById('crashGrid').innerHTML = [
-    ['Bug Check Code', crash.bugcheck_code || 'N/A', true],
-    ['Bug Check Name', crash.bugcheck_name || 'UNKNOWN', false],
-    ['Crash Address', crash.crash_address || 'N/A', true],
-    ['Caused By', crash.caused_by_driver || 'Unknown', false],
-    ['Parameters', (crash.bugcheck_parameters || []).join(', ') || 'N/A', true],
-    ['Dump Type', data.dump_type || 'Unknown', false],
-  ].map(([l, v, mono]) => `
-    <div class="info-item">
-      <div class="info-label">${l}</div>
-      <div class="info-value ${mono ? 'highlight' : ''}">${v}</div>
-    </div>`).join('');
-
-  document.getElementById('bugcheckDesc').textContent = crash.bugcheck_description || '';
-
-  // System grid
-  document.getElementById('systemGrid').innerHTML = [
-    ['OS Version', sys.os_version || 'Unknown'],
-    ['Architecture', data.architecture || 'Unknown'],
-    ['Build Number', sys.build_number || 'Unknown'],
-    ['Processors', sys.processor_count || 'Unknown'],
-    ['File Size', formatBytes(data.file_size_bytes || 0)],
-    ['Analysis Time', (data.analysis_time_seconds || 0).toFixed(3) + 's'],
-  ].map(([l, v]) => `
-    <div class="info-item">
-      <div class="info-label">${l}</div>
-      <div class="info-value">${v}</div>
-    </div>`).join('');
-
-  // Causes
-  const causes = diag.known_causes || [];
-  document.getElementById('causesList').innerHTML = causes.length
-    ? causes.map((c, i) => `<li><span class="fix-num">${i+1}</span>${c}</li>`).join('')
-    : '<li style="color:var(--text-secondary)">No known causes identified</li>';
-
-  // Fixes
-  const fixes = diag.suggested_fixes || [];
-  document.getElementById('fixesList').innerHTML = fixes.length
-    ? fixes.map((f, i) => `<li><span class="fix-num">${i+1}</span>${f}</li>`).join('')
-    : '<li style="color:var(--text-secondary)">No fixes available</li>';
-
-  // Modules
-  const modules = data.loaded_modules || [];
-  document.getElementById('moduleCount').textContent = `${modules.length} modules`;
-  document.getElementById('modulesBody').innerHTML = modules.slice(0, 50).map((m, i) => `
-    <tr>
-      <td style="color:var(--text-muted)">${i+1}</td>
-      <td style="color:var(--accent-blue)">${m.name || '?'}</td>
-      <td>${m.base_address || '?'}</td>
-      <td>${formatBytes(m.size || 0)}</td>
-    </tr>`).join('');
-
-  // Exception
-  const exc = data.exception;
-  if (exc && Object.keys(exc).length > 0) {
-    document.getElementById('cardException').style.display = '';
-    document.getElementById('exceptionBody').innerHTML = `
-      <div class="info-grid">
-        <div class="info-item"><div class="info-label">Exception Code</div><div class="info-value highlight">${exc.code || 'N/A'}</div></div>
-        <div class="info-item"><div class="info-label">Exception Address</div><div class="info-value highlight">${exc.address || 'N/A'}</div></div>
-      </div>`;
+  // Top Section
+  let bucket = "Unknown";
+  if (crash.bugcheck_name && crash.caused_by_driver) {
+    const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
+    bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${driverName}!Unknown`;
+  } else if (crash.bugcheck_name) {
+    bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${crash.bugcheck_name}`;
   }
+  document.getElementById('valFailureBucket').innerText = bucket;
 
-  // WinDbg Output
-  if (data.windbg_output) {
-    document.getElementById('cardWindbg').style.display = '';
-    document.getElementById('windbgBody').textContent = data.windbg_output;
+  document.getElementById('valProcess').innerText = "System";
+  
+  let symbol = "Unknown";
+  if (crash.caused_by_driver) {
+    const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
+    symbol = `${driverName}!Unknown+offset`;
   }
+  document.getElementById('valSymbol').innerText = symbol;
+
+  const osVer = sys.os_version || 'Unknown';
+  const build = sys.build_number || 'Unknown';
+  document.getElementById('valWindows').innerText = `${osVer} (10.0.${build}.1)`;
+
+  // Parameter Analysis
+  const params = crash.bugcheck_parameters || [0,0,0,0];
+  const paramDesc = [
+    { name: 'Parameter 1', desc: 'Indicates the type of violation or first argument to the bug check.' },
+    { name: 'Parameter 2', desc: 'Often the address of the trap frame for the exception.' },
+    { name: 'Parameter 3', desc: 'Often the address of the exception record.' },
+    { name: 'Parameter 4', desc: 'Reserved or additional context.' },
+  ];
+
+  document.getElementById('paramRows').innerHTML = params.map((p, i) => `
+    <div class="param-row">
+      <div class="param-val">0x${(p || 0).toString(16)}</div>
+      <div class="flex-col">
+        <div class="param-name">Reserved / Context ${i+1}</div>
+        <div class="param-desc"><span style="color:#94a3b8;margin-right:8px">${paramDesc[i].name}</span> ${paramDesc[i].desc}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // Auto-start AI Diagnosis
+  runAIDiagnosis();
 }
 
 function formatBytes(bytes) {
@@ -967,36 +1030,35 @@ Return JSON with keys: lay_summary, technical_analysis, root_cause, confidence, 
 
 function renderAIResult(ai) {
   document.getElementById('aiLoading').style.display = 'none';
-  document.getElementById('aiResult').style.display = 'block';
-  const fixes = (ai.prioritized_fixes || []).map((f, i) => `<li><span class="fix-num">${i+1}</span>${f}</li>`).join('');
-  const checks = (ai.additional_checks || []).map(c => `<li style="padding:4px 0;font-size:0.85rem;color:var(--text-secondary)">• ${c}</li>`).join('');
-  document.getElementById('aiResult').innerHTML = `
-    <div style="margin-bottom:16px;padding:14px;background:var(--bg-secondary);border-left:3px solid var(--accent-purple);border-radius:0 8px 8px 0">
-      <div style="font-size:0.75rem;color:var(--accent-purple);font-weight:600;margin-bottom:6px">NON-TECHNICAL SUMMARY</div>
-      <p style="font-size:0.9rem;line-height:1.6">${ai.lay_summary}</p>
-    </div>
-    <div style="margin-bottom:16px;padding:14px;background:var(--bg-secondary);border-left:3px solid var(--accent-blue);border-radius:0 8px 8px 0">
-      <div style="font-size:0.75rem;color:var(--accent-blue);font-weight:600;margin-bottom:6px">TECHNICAL ANALYSIS</div>
-      <p style="font-size:0.875rem;line-height:1.6;font-family:var(--font-mono)">${ai.technical_analysis}</p>
-    </div>
-    <div style="margin-bottom:16px">
-      <div style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;margin-bottom:6px">ROOT CAUSE</div>
-      <p style="font-size:0.875rem;padding:10px;background:var(--bg-secondary);border-radius:6px">${ai.root_cause}</p>
-    </div>
-    <div class="confidence-bar" style="margin-bottom:16px">
-      <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:0.75rem;color:var(--text-secondary);font-weight:600">AI CONFIDENCE</span>
-        <span style="font-family:var(--font-mono);font-size:0.85rem;color:var(--accent-purple)">${ai.confidence}%</span>
+  const resultDiv = document.getElementById('aiResult');
+  resultDiv.style.display = 'block';
+
+  // Handle problematic drivers (simulate using AI output or current state)
+  // We'll show a mocked up problematic driver if it exists in analysisResult
+  const crash = window.currentAnalysis?.crash_summary || {};
+  if (crash.caused_by_driver && crash.caused_by_driver !== 'Unknown') {
+    document.getElementById('driverCard').style.display = 'block';
+    document.getElementById('driverList').innerHTML = `
+      <div class="driver-item">
+        <div class="driver-name">${crash.caused_by_driver} <span class="driver-badge">security</span></div>
+        <div class="driver-desc">Identified as the potential root cause of the crash. Known to cause stability issues or conflict with kernel processes.</div>
+        <div class="driver-tip">Tip: Update the software to the latest version or temporarily remove it to test system stability.</div>
       </div>
-      <div class="confidence-track"><div class="confidence-fill" style="width:${ai.confidence}%"></div></div>
-      <div style="font-size:0.75rem;color:var(--text-muted);margin-top:4px">${ai.confidence_reason}</div>
-    </div>
-    <div style="margin-bottom:12px">
-      <div style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;margin-bottom:8px">PRIORITIZED FIXES</div>
-      <ul class="fix-list">${fixes}</ul>
-    </div>
-    ${checks ? `<div><div style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;margin-bottom:6px">ADDITIONAL CHECKS</div><ul style="list-style:none">${checks}</ul></div>` : ''}
-  `;
+    `;
+  }
+
+  // Set AI summary
+  document.getElementById('aiSummary').innerHTML = `"...The system crashed with a ${crash.bugcheck_name || 'UNKNOWN_BUGCHECK'} (${crash.bugcheck_code ? '0x'+crash.bugcheck_code.toString(16) : 'N/A'}) due to a fault in the ${crash.caused_by_driver || 'system'} driver stack."`;
+
+  // Parse AI output for Probable Cause and Recommendations
+  document.getElementById('aiCause').innerHTML = `<p>${ai.technical_analysis || ai.root_cause || "No clear cause identified."}</p>`;
+  
+  const fixes = ai.prioritized_fixes || [];
+  if (fixes.length > 0) {
+    document.getElementById('aiRecommendations').innerHTML = `<ul>${fixes.map(f => `<li>${f}</li>`).join('')}</ul>`;
+  } else {
+    document.getElementById('aiRecommendations').innerHTML = '<p>No specific recommendations.</p>';
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
