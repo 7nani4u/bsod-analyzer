@@ -1,24 +1,23 @@
 {
   "version": 2,
   "functions": {
-    "api/main.py": {
-      "excludeFiles": "{venv/**,tests/**,.git/**,.pytest_cache/**,**/__pycache__/**,test_*.py}",
+    "api/**/*.py": {
       "maxDuration": 60,
       "memory": 1024
     }
   },
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "api/main.py"
+      "source": "/api/(.*)",
+      "destination": "/api/main.py"
     },
     {
-      "src": "/static/(.*)",
-      "dest": "frontend/$1"
+      "source": "/static/(.*)",
+      "destination": "/frontend/$1"
     },
     {
-      "src": "/(.*)",
-      "dest": "frontend/index.html"
+      "source": "/(.*)",
+      "destination": "/frontend/index.html"
     }
   ]
 }
