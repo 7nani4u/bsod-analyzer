@@ -679,6 +679,11 @@ async function directUpload(file) {
 }
 
 async function chunkedUpload(file) {
+  // Vercel serverless hard limit: 4.5 MB per request body.
+  // We use 4 MB chunks to stay safely under the limit.
+  const VERCEL_CHUNK_SIZE = 4 * 1024 * 1024; // 4 MB
+  const MAX_RETRIES = 3;
+
   // Init session
   setProgress(5, 'Initializing upload session...');
   const initResp = await fetch(`${API_BASE}/api/upload/init`, {
@@ -686,41 +691,81 @@ async function chunkedUpload(file) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ filename: file.name, file_size: file.size }),
   });
-  if (!initResp.ok) throw new Error('Failed to init upload session');
-  const { upload_id, chunk_size, total_chunks } = await initResp.json();
+  if (!initResp.ok) {
+    const e = await initResp.json().catch(() => ({}));
+    throw new Error('Failed to init upload session: ' + (e.detail || initResp.status));
+  }
+  // Override server chunk_size with our Vercel-safe 4 MB value
+  const { upload_id, total_chunks: serverTotalChunks } = await initResp.json();
+  const total_chunks = Math.ceil(file.size / VERCEL_CHUNK_SIZE);
 
-  // Upload chunks
+  // Upload chunks with retry
   for (let i = 1; i <= total_chunks; i++) {
-    const start = (i - 1) * chunk_size;
-    const end = Math.min(start + chunk_size, file.size);
+    const start = (i - 1) * VERCEL_CHUNK_SIZE;
+    const end = Math.min(start + VERCEL_CHUNK_SIZE, file.size);
     const chunk = file.slice(start, end);
     const chunkBuf = await chunk.arrayBuffer();
 
-    const chunkResp = await fetch(`${API_BASE}/api/upload/chunk/${upload_id}?part_number=${i}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/octet-stream' },
-      body: chunkBuf,
-    });
-    if (!chunkResp.ok) throw new Error(`Chunk ${i} upload failed`);
+    let lastErr = null;
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const chunkResp = await fetch(
+          `${API_BASE}/api/upload/chunk/${upload_id}?part_number=${i}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/octet-stream' },
+            body: chunkBuf,
+          }
+        );
+        if (chunkResp.ok) { lastErr = null; break; }
+        const errBody = await chunkResp.json().catch(() => ({}));
+        lastErr = new Error(
+          `Chunk ${i} failed (HTTP ${chunkResp.status}): ${errBody.detail || chunkResp.statusText}`
+        );
+        if (chunkResp.status === 413) {
+          // Hard size error — no point retrying
+          throw lastErr;
+        }
+      } catch (fetchErr) {
+        lastErr = fetchErr;
+      }
+      if (attempt < MAX_RETRIES) {
+        setProgress(
+          Math.round((i / total_chunks) * 60) + 5,
+          `Retrying chunk ${i}/${total_chunks} (attempt ${attempt + 1}/${MAX_RETRIES})...`
+        );
+        await sleep(1000 * attempt); // exponential back-off
+      }
+    }
+    if (lastErr) throw lastErr;
+
     const pct = Math.round((i / total_chunks) * 60) + 5;
-    setProgress(pct, `Uploading... ${i}/${total_chunks} chunks`);
+    const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+    const doneMB = Math.min(end / 1024 / 1024, file.size / 1024 / 1024).toFixed(1);
+    setProgress(pct, `Uploading ${doneMB} MB / ${sizeMB} MB  (${i}/${total_chunks} chunks)`);
   }
   setStep('upload', 'done');
 
   // Complete
-  setProgress(70, 'Assembling file...');
+  setProgress(70, 'Assembling file on server...');
   const completeResp = await fetch(`${API_BASE}/api/upload/complete`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ upload_id, parts: Array.from({length: total_chunks}, (_, i) => i + 1) }),
+    body: JSON.stringify({ upload_id, parts: Array.from({length: total_chunks}, (_, k) => k + 1) }),
   });
-  if (!completeResp.ok) throw new Error('Failed to complete upload');
+  if (!completeResp.ok) {
+    const e = await completeResp.json().catch(() => ({}));
+    throw new Error('Failed to complete upload: ' + (e.detail || completeResp.status));
+  }
 
   // Analyze
   setStep('parse', 'active');
-  setProgress(80, 'Analyzing dump...');
+  setProgress(80, 'Analyzing dump file...');
   const analyzeResp = await fetch(`${API_BASE}/api/analyze/by-upload-id/${upload_id}`);
-  if (!analyzeResp.ok) { const e = await analyzeResp.json(); throw new Error(e.detail || 'Analysis failed'); }
+  if (!analyzeResp.ok) {
+    const e = await analyzeResp.json().catch(() => ({}));
+    throw new Error(e.detail || 'Analysis failed');
+  }
   setStep('parse', 'done'); setStep('bugcheck', 'done'); setStep('modules', 'done');
   return await analyzeResp.json();
 }
