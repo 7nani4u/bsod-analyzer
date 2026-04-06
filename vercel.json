@@ -2,24 +2,11 @@
   "version": 2,
   "functions": {
     "api/main.py": {
-      "excludeFiles": "{venv/**,tests/**,.git/**,.pytest_cache/**,**/__pycache__/**,test_*.py}"
+      "excludeFiles": "{venv/**,tests/**,.git/**,.pytest_cache/**,**/__pycache__/**,test_*.py}",
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
-  "builds": [
-    {
-      "src": "api/main.py",
-      "use": "@vercel/python",
-      "config": {
-        "maxLambdaSize": "50mb",
-        "maxDuration": 60,
-        "memory": 1024
-      }
-    },
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
     {
       "src": "/api/(.*)",
