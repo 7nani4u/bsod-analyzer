@@ -119,6 +119,16 @@ class AnalysisResult:
     log_type: str = "Unknown"
     thread_count: int = 0
     module_count: int = 0
+    analysis_mode: str = "unknown"
+    faulting_process: str = "Unknown"
+    failure_bucket: str = "Unknown"
+    faulting_thread: str = "N/A"
+    stack_core: str = "N/A"
+    third_party_intervention: str = "N/A"
+    root_cause_analysis: list[dict] = field(default_factory=list)
+    additional_analysis_recommendations: list[str] = field(default_factory=list)
+    recommended_windbg_commands: list[str] = field(default_factory=list)
+    recommended_windbg_script: str = ""
 
     # Suggested fixes
     suggested_fixes: list[str] = field(default_factory=list)
@@ -637,6 +647,8 @@ class MdmpParser:
                 "vendor": known.get("vendor", ""),
                 "type": known.get("type", "unknown"),
             })
+            if mod_name and mod_name.lower().endswith(".exe") and "process_name" not in result.system_info:
+                result.system_info["process_name"] = mod_name
 
     def _parse_thread_list(self, data: bytes, rva: int, result: AnalysisResult) -> None:
         if rva + 4 > len(data):
@@ -728,7 +740,8 @@ class DumpAnalyzer:
                 data = fh.read(read_size)
 
             self._dispatch(data, result)
-            
+            self._enrich_ui_metadata(result)
+
             # Generate simulated WinDbg output since cdb.exe is not available on Vercel
             self._generate_simulated_windbg_output(result)
 
@@ -741,34 +754,38 @@ class DumpAnalyzer:
             result.errors.append(f"Unexpected analysis error: {exc}")
 
         result.analysis_time = round(time.time() - start, 3)
-        self._enrich_ui_metadata(result)
         return result.to_dict()
 
     def _enrich_ui_metadata(self, result: AnalysisResult) -> None:
         import datetime
+
+        result.analysis_mode = "user" if self._is_user_mode(result) else ("kernel" if result.dump_type != "Unknown" else "unknown")
+
         # log_type
-        if "MDMP" in result.dump_type or "User-mode" in result.dump_type:
+        if result.analysis_mode == "user":
             result.log_type = "WinDbg 기반 User Mini Dump Analysis"
-        else:
+        elif result.analysis_mode == "kernel":
             result.log_type = "WinDbg 기반 Kernel Dump Analysis"
+        else:
+            result.log_type = "Heuristic Dump Analysis"
 
         # thread_count, module_count
         result.thread_count = len(result.threads)
         result.module_count = len(result.loaded_modules)
 
-        # target_process
-        if "process_id" in result.system_info:
-            pid = result.system_info["process_id"]
-            if result.loaded_modules:
-                first_mod = result.loaded_modules[0]["name"]
-                if first_mod.lower().endswith(".exe"):
-                    result.target_process = f"{first_mod} (PID: {pid})"
-                else:
-                    result.target_process = f"PID: {pid}"
-            else:
-                result.target_process = f"PID: {pid}"
+        # target_process / faulting_process
+        process_name = result.system_info.get("process_name", "")
+        pid = result.system_info.get("process_id")
+        if process_name:
+            result.target_process = f"{process_name} (PID: {pid})" if pid else process_name
+        elif pid:
+            result.target_process = f"PID: {pid}"
+        elif result.loaded_modules:
+            first_exe = next((m.get("name", "") for m in result.loaded_modules if m.get("name", "").lower().endswith(".exe")), "")
+            result.target_process = first_exe or "System"
         else:
             result.target_process = "System"
+        result.faulting_process = result.target_process
 
         # debug_session_time
         ts = result.system_info.get("timestamp")
@@ -791,7 +808,7 @@ class DumpAnalyzer:
             result.process_uptime = f"{h}시간 {m}분 {s}초"
         else:
             result.process_uptime = "N/A"
-            
+
         # system_uptime
         sys_uptime = result.system_info.get("system_uptime_sec")
         if sys_uptime:
@@ -801,6 +818,302 @@ class DumpAnalyzer:
             result.system_uptime = f"{h}시간 {m}분 {s}초"
         else:
             result.system_uptime = "N/A"
+
+        self._populate_highlights(result)
+
+    def _is_user_mode(self, result: AnalysisResult) -> bool:
+        return "MDMP" in result.dump_type or "User-mode" in result.dump_type
+
+    def _populate_highlights(self, result: AnalysisResult) -> None:
+        result.failure_bucket = self._build_failure_bucket(result)
+        result.faulting_thread = self._build_faulting_thread(result)
+        result.stack_core = self._build_stack_core(result)
+        result.third_party_intervention = self._build_third_party_intervention(result)
+        result.root_cause_analysis = self._build_root_cause_analysis(result)
+        result.additional_analysis_recommendations = self._build_additional_recommendations(result)
+        result.recommended_windbg_commands = self._build_recommended_windbg_commands(result)
+        result.recommended_windbg_script = "\n".join(result.recommended_windbg_commands)
+
+    def _build_failure_bucket(self, result: AnalysisResult) -> str:
+        if self._is_user_mode(result):
+            exc_code = 0
+            if result.exception:
+                exc_code = int(result.exception.get("code", 0) or 0)
+            code_hex = f"{exc_code:08X}" if exc_code else "00000000"
+            module = result.caused_by_driver or self._pick_primary_user_module(result) or "unknown_module"
+            symbol = "UnhandledException"
+            bug_name = (result.bugcheck_name or "USER_MODE_EXCEPTION").replace(" ", "_")
+            return f"{bug_name}_{code_hex}_{module}!{symbol}"
+
+        bug_name = (result.bugcheck_name or "UNKNOWN_BUGCHECK").replace(" ", "_")
+        driver = result.caused_by_driver or "unknown_driver"
+        return f"0x{result.bugcheck_code:08X}_{bug_name}_{driver}"
+
+    def _build_faulting_thread(self, result: AnalysisResult) -> str:
+        if result.exception and result.exception.get("thread_id") is not None:
+            try:
+                return f"FAULTING_THREAD: {int(result.exception['thread_id']):08x}"
+            except Exception:
+                pass
+        if result.threads:
+            try:
+                return f"FAULTING_THREAD: {int(result.threads[0].get('thread_id', 0)):08x}"
+            except Exception:
+                pass
+        return "FAULTING_THREAD: N/A"
+
+    def _pick_primary_user_module(self, result: AnalysisResult) -> str:
+        preferred = [
+            result.caused_by_driver,
+            "twinapi.appcore.dll",
+            "KERNELBASE.dll",
+            "ntdll.dll",
+        ]
+        modules = {m.get("name", "").lower(): m.get("name", "") for m in result.loaded_modules if m.get("name")}
+        for name in preferred:
+            if name and name.lower() in modules:
+                return modules[name.lower()]
+        for mod in result.loaded_modules:
+            name = mod.get("name", "")
+            if name.lower().endswith((".dll", ".exe")):
+                return name
+        return ""
+
+    def _build_stack_core(self, result: AnalysisResult) -> str:
+        if result.stack_trace:
+            parts = []
+            for frame in result.stack_trace[:5]:
+                mod = frame.get("module") or "?"
+                sym = frame.get("symbol") or "Unknown"
+                parts.append(f"{mod}!{sym}")
+            return " → ".join(parts) if parts else "N/A"
+
+        if self._is_user_mode(result):
+            ordered = []
+            present = {m.get("name", "").lower(): m.get("name", "") for m in result.loaded_modules if m.get("name")}
+            process_name = result.system_info.get("process_name", "") or next((m.get("name", "") for m in result.loaded_modules if m.get("name", "").lower().endswith(".exe")), "")
+            for candidate in ["ntdll.dll", "KERNELBASE.dll", result.caused_by_driver, "twinapi.appcore.dll", "Windows.UI.Xaml.dll", process_name]:
+                if candidate and candidate.lower() in present:
+                    value = present[candidate.lower()]
+                    if value not in ordered:
+                        ordered.append(value)
+            for mod in result.loaded_modules:
+                value = mod.get("name", "")
+                if value and value not in ordered and value.lower().endswith((".dll", ".exe")):
+                    ordered.append(value)
+                if len(ordered) >= 5:
+                    break
+            return " → ".join(ordered[:5]) if ordered else "N/A"
+
+        driver = result.caused_by_driver or "unknown_driver.sys"
+        module = driver.split(".")[0]
+        return f"nt!KeBugCheckEx → nt!KiBugCheckDispatch → {module}!Unknown"
+
+    def _collect_suspicious_modules(self, result: AnalysisResult) -> list[str]:
+        suspicious = []
+        keywords = (
+            "fasoo", "fasoo", "ahn", "drm", "nx", "edr", "crowd", "sentinel",
+            "cylance", "symantec", "mcafee", "trellix", "carbon", "black", "defender"
+        )
+        seen = set()
+        for mod in result.loaded_modules:
+            name = (mod.get("name", "") or "").strip()
+            if not name:
+                continue
+            vendor = (mod.get("vendor", "") or "").lower()
+            lower = name.lower()
+            if "microsoft" in vendor and not any(k in lower for k in ("fasoo", "ahn", "drm", "nx")):
+                continue
+            if any(k in lower for k in keywords):
+                if lower not in seen:
+                    suspicious.append(name)
+                    seen.add(lower)
+                continue
+            if lower.endswith((".dll", ".sys")) and mod.get("type", "unknown") not in ("kernel", "os"):
+                if lower not in seen:
+                    suspicious.append(name)
+                    seen.add(lower)
+        return suspicious[:12]
+
+    def _build_third_party_intervention(self, result: AnalysisResult) -> str:
+        suspicious = self._collect_suspicious_modules(result)
+        if not suspicious:
+            return "뚜렷한 제3자 개입 흔적 없음"
+
+        lower_names = [name.lower() for name in suspicious]
+        if any("fasoo" in name or name.startswith("f_") for name in lower_names):
+            label = "Fasoo DRM 다수 로드"
+        elif any("ahn" in name for name in lower_names):
+            label = "AhnLab 보안 모듈 로드"
+        else:
+            label = "비-Microsoft 모듈 다수 로드"
+
+        preview = ", ".join(suspicious[:8])
+        if len(suspicious) > 8:
+            preview += " 등"
+        return f"{preview} ({label})"
+
+    def _build_root_cause_analysis(self, result: AnalysisResult) -> list[dict]:
+        causes = []
+        suspicious = self._collect_suspicious_modules(result)
+        suspicious_text = ", ".join(suspicious[:8])
+        lower_modules = {m.get("name", "").lower() for m in result.loaded_modules}
+        process_name = (result.system_info.get("process_name", "") or result.target_process or "").lower()
+
+        if suspicious:
+            cause_name = "제3자 DRM/보안 모듈 개입 가능성"
+            details = suspicious_text + " 로드로 외부 후킹/주입 가능성이 보입니다."
+            causes.append({"cause": cause_name, "details": details})
+
+        if self._is_user_mode(result):
+            if any(name in lower_modules for name in {"printdialog.dll", "windows.ui.xaml.dll", "twinapi.appcore.dll"}) or "print" in process_name:
+                details = "twinapi.appcore.dll, Windows.UI.Xaml.dll, PrintDialog.exe/PrintDialog.dll 경로에서 사용자 모드 예외 또는 호환성 이슈 가능성이 있습니다."
+                causes.append({"cause": "PrintDialog/UWP-XAML 인쇄 대화상자 경로 취약성 또는 호환성 이슈", "details": details})
+            elif result.caused_by_driver:
+                details = f"{result.caused_by_driver} 모듈 주변에서 예외가 감지되었으며, 호출 경로 충돌 또는 버전 불일치 가능성이 있습니다."
+                causes.append({"cause": f"{result.caused_by_driver} 경로 예외/호환성 이슈", "details": details})
+        else:
+            details = []
+            if result.caused_by_driver:
+                details.append(f"의심 드라이버: {result.caused_by_driver}")
+            if result.bugcheck_description:
+                details.append(result.bugcheck_description)
+            if result.known_causes:
+                details.append("가능 원인: " + "; ".join(result.known_causes[:3]))
+            causes.append({"cause": "드라이버/커널 메모리 손상 가능성", "details": " ".join(details).strip() or "커널 경로에서 오류가 감지되었습니다."})
+
+        deduped = []
+        seen = set()
+        for item in causes:
+            key = item["cause"]
+            if key not in seen:
+                deduped.append(item)
+                seen.add(key)
+        return deduped[:2]
+
+    def _build_additional_recommendations(self, result: AnalysisResult) -> list[str]:
+        recs = []
+        lower_modules = {m.get("name", "").lower() for m in result.loaded_modules}
+        suspicious = self._collect_suspicious_modules(result)
+
+        if self._is_user_mode(result):
+            print_path = any(name in lower_modules for name in {"printdialog.dll", "windows.ui.xaml.dll", "twinapi.appcore.dll"}) or "print" in (result.target_process or "").lower()
+            if print_path:
+                recs.extend([
+                    "추가 로그 : Application, System, Microsoft-Windows-PrintService/Operational",
+                    "추가 덤프 : 재현 시 전체 user dump",
+                    "추가 추적 : ProcMon, ETW(AppModel/Print 관련)",
+                    "추가 비교 : 문제 프린터 vs PDF/XPS vs 타 프린터",
+                ])
+            if suspicious and any("fasoo" in name.lower() or name.lower().startswith("f_") for name in suspicious):
+                recs.append("추가 확인 : Fasoo 버전/정책, 프린터 드라이버 버전, 최근 Windows 업데이트 이력")
+            elif suspicious:
+                recs.append("추가 확인 : 제3자 보안/DRM 모듈 버전, 정책, 최근 업데이트 이력")
+            if not recs:
+                recs.extend([
+                    "추가 덤프 : 재현 시 전체 user dump",
+                    "추가 추적 : ProcMon 또는 ETW로 예외 직전 I/O 및 모듈 로드 추적",
+                ])
+        else:
+            driver_hint = (result.caused_by_driver or "").lower()
+            cause_blob = " ".join(result.known_causes).lower()
+            if any(token in driver_hint or token in cause_blob for token in ("usb", "xhci", "usbhub", "usbxhci")):
+                recs.extend([
+                    "칩셋/USB 컨트롤러 드라이버를 제조사 최신 버전으로 업데이트",
+                    "불필요한 USB 장치를 분리한 상태에서 재현 여부를 비교",
+                    "메인보드 BIOS/칩셋 드라이버 업데이트 여부를 확인",
+                ])
+            recs.extend(result.suggested_fixes[:4])
+
+        deduped = []
+        seen = set()
+        for rec in recs:
+            if rec not in seen:
+                deduped.append(rec)
+                seen.add(rec)
+        return deduped[:8]
+
+    def _build_recommended_windbg_commands(self, result: AnalysisResult) -> list[str]:
+        common = [
+            ".prefer_dml 1",
+            ".symfix",
+            ".symopt+0x100000",
+            ".reload",
+            ".time",
+            ".dumpdebug",
+            ".lastevent",
+            "vertarget",
+            "version",
+            "!sysinfo cpuinfo",
+            "!sysinfo machineid",
+        ]
+
+        if self._is_user_mode(result):
+            mode_specific = [
+                ".exr -1",
+                ".ecxr",
+                "kv 100",
+                ".if (@$ip != 0) { u @$ip L40 ; ub @$ip L20 }",
+                "r",
+                "!address @$ip",
+                "!runaway 7",
+                "!cs -s -o",
+                "!address -summary",
+                "!heap -s",
+                "lm t n",
+                "lmv m ms*",
+                "!handle 0 0",
+                "!handle 0 1",
+                "!peb",
+                "!teb",
+                "!dlls -l",
+                "!gle",
+            ]
+        else:
+            mode_specific = [
+                ".exr -1",
+                ".ecxr",
+                "kv 100",
+                ".if (@$ip != 0) { u @$ip L40 ; ub @$ip L20 }",
+                "r",
+                "!address @$ip",
+                "!runaway 7",
+                "!cs -s -o",
+                "!address -summary",
+                "!heap -s",
+                "lm t n",
+                "lmv m ms*",
+                "!handle 0 0",
+                "!handle 0 1",
+                "!peb",
+                "!teb",
+                "!dlls -l",
+                "!gle",
+                ".bugcheck",
+                ".if (@rcx != 0) { .echo [RCX 검증]; !pte @rcx; !address @rcx }",
+                ".if (@rdx != 0) { .echo [RDX 검증]; !pte @rdx; !address @rdx }",
+                ".if (@r8  != 0) { .echo [R8  검증]; !pte @r8;  !address @r8 }",
+                ".if (@r9  != 0) { .echo [R9  검증]; !pte @r9;  !address @r9 }",
+                "!thread",
+                "!process 0 0",
+                "!running -t -i",
+                "!irql",
+                "!locks",
+                "!dpcs",
+                "!timer",
+                "!idt",
+                "!vm",
+                "!poolused 2",
+                "!poolused 4",
+                "!memusage",
+                "lm t n k",
+                "!lmi nt",
+                "!powertriage",
+                "!whea",
+                "!prcb",
+                "!cpuinfo",
+            ]
+        return common + mode_specific
 
     def _generate_simulated_windbg_output(self, result: AnalysisResult) -> None:
         """
@@ -1049,10 +1362,27 @@ class DumpAnalyzer:
         lines.append("!mex.mods")
         lines.append(".echo ")
         
-        lines.append(".echo =========== [6] 분석 완료 ===========")
+        lines.append(".echo ")
+        lines.append(".echo =========== [6] 구조화 요약 ===========")
+        lines.append(f"MODE: {result.analysis_mode.upper()}")
+        lines.append(f"FAILURE_BUCKET: {result.failure_bucket}")
+        lines.append(result.faulting_thread)
+        lines.append(f"PROCESS: {result.faulting_process}")
+        lines.append(f"STACK_CORE: {result.stack_core}")
+        lines.append(f"THIRD_PARTY: {result.third_party_intervention}")
+        for idx, cause in enumerate(result.root_cause_analysis, start=1):
+            lines.append(f"ROOT_CAUSE_{idx}: {cause.get('cause', 'Unknown')}")
+            lines.append(f"ROOT_CAUSE_{idx}_DETAILS: {cause.get('details', 'N/A')}")
+        for rec in result.additional_analysis_recommendations:
+            lines.append(f"RECOMMENDATION: {rec}")
+        lines.append(".echo ")
+        lines.append(".echo =========== [7] 권장 WinDbg 명령 스크립트 ===========")
+        lines.extend(result.recommended_windbg_commands or [])
+        lines.append(".echo ")
+        lines.append(".echo =========== [8] 분석 완료 ===========")
         lines.append(".echo ")
         lines.append(".logclose")
-        
+
         result.windbg_output = "\n".join(lines)
 
     def analyze_bytes(self, data: bytes) -> dict:
@@ -1063,14 +1393,15 @@ class DumpAnalyzer:
 
         try:
             self._dispatch(data, result)
+            self._enrich_ui_metadata(result)
             self._generate_simulated_windbg_output(result)
         except Exception as exc:
             logger.exception("Unexpected error during dump analysis")
             result.errors.append(f"Unexpected analysis error: {exc}")
 
         result.analysis_time = round(time.time() - start, 3)
-        self._enrich_ui_metadata(result)
         return result.to_dict()
+
 
     def _dispatch(self, data: bytes, result: AnalysisResult) -> None:
         if len(data) < 8:

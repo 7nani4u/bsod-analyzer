@@ -957,24 +957,59 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // ═══════════════════════════════════════════════════════════════════════
 // Render Results
 // ═══════════════════════════════════════════════════════════════════════
+function renderHeuristicInsights(data) {
+  const crash = data.crash_summary || {};
+  document.getElementById('aiMajorErrors').style.display = 'block';
+  document.getElementById('valAiBucket').innerText = data.failure_bucket || `${crash.bugcheck_name || 'UNKNOWN'}_${crash.caused_by_driver || 'Unknown'}`;
+  document.getElementById('valAiThread').innerText = data.faulting_thread || 'FAULTING_THREAD: N/A';
+  document.getElementById('valAiProcess').innerText = data.faulting_process || data.target_process || 'N/A';
+  document.getElementById('valAiStack').innerText = data.stack_core || 'N/A';
+  document.getElementById('valAiThirdParty').innerText = data.third_party_intervention || 'N/A';
+
+  const causes = data.root_cause_analysis || [];
+  if (causes.length > 0) {
+    document.getElementById('aiRootCauses').style.display = 'block';
+    document.getElementById('rootCauseList').innerHTML = causes.map(c => `
+      <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #1e293b;">
+        <div style="margin-bottom: 12px;">
+          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">원인 항목</div>
+          <div style="color: #f1f5f9; font-weight: 600;">${c.cause || 'Unknown'}</div>
+        </div>
+        <div>
+          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">주요 관련 드라이버/징후</div>
+          <div style="color: #f1f5f9; line-height: 1.5;">${c.details || 'N/A'}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const recs = data.additional_analysis_recommendations || data.diagnosis?.suggested_fixes || [];
+  if (recs.length > 0) {
+    document.getElementById('aiRecommendationsExt').style.display = 'block';
+    document.getElementById('valAiRecs').innerHTML = recs.map(r => `<div>${r}</div>`).join('');
+  }
+}
+
 function renderResults(data) {
   const crash = data.crash_summary || {};
   const sys = data.system_info || {};
 
   // Top Section
-  let bucket = "Unknown";
-  if (crash.bugcheck_name && crash.caused_by_driver) {
-    const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
-    bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${driverName}!Unknown`;
-  } else if (crash.bugcheck_name) {
-    bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${crash.bugcheck_name}`;
+  let bucket = data.failure_bucket || "Unknown";
+  if (bucket === "Unknown") {
+    if (crash.bugcheck_name && crash.caused_by_driver) {
+      const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
+      bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${driverName}!Unknown`;
+    } else if (crash.bugcheck_name) {
+      bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${crash.bugcheck_name}`;
+    }
   }
   document.getElementById('valFailureBucket').innerText = bucket;
 
-  document.getElementById('valProcess').innerText = "System";
+  document.getElementById('valProcess').innerText = data.faulting_process || data.target_process || "System";
   
-  let symbol = "Unknown";
-  if (crash.caused_by_driver) {
+  let symbol = data.stack_core || "Unknown";
+  if (symbol === "Unknown" && crash.caused_by_driver) {
     const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
     symbol = `${driverName}!Unknown+offset`;
   }
@@ -1011,6 +1046,9 @@ function renderResults(data) {
   document.getElementById('metaLogType').innerText = data.log_type || 'N/A';
   document.getElementById('metaThreadCount').innerText = data.thread_count !== undefined ? `${data.thread_count}` : 'N/A';
   document.getElementById('metaModuleCount').innerText = data.module_count !== undefined ? `${data.module_count}` : 'N/A';
+
+  // Render heuristic insights immediately so the requested sections are available even without AI.
+  renderHeuristicInsights(data);
 
   // Auto-start AI Diagnosis
   runAIDiagnosis();

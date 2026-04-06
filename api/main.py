@@ -274,12 +274,16 @@ def validate_dump_file(file: UploadFile) -> None:
 
 def format_analysis_response(raw: dict, filename: str) -> dict:
     """Convert raw DumpAnalyzer result to structured API response."""
+    analysis_time = raw.get("analysis_time")
+    if analysis_time is None:
+        analysis_time = round(raw.get("analysis_time_ms", 0) / 1000, 3)
     return {
         "filename": filename,
         "dump_type": raw.get("dump_type", "Unknown"),
         "architecture": raw.get("architecture", "Unknown"),
-        "file_size_bytes": raw.get("file_size_bytes", 0),
-        "analysis_time_seconds": round(raw.get("analysis_time_ms", 0) / 1000, 3),
+        "file_size_bytes": raw.get("file_size", raw.get("file_size_bytes", 0)),
+        "analysis_time_seconds": round(analysis_time or 0, 3),
+        "analysis_mode": raw.get("analysis_mode", "unknown"),
         "crash_summary": {
             "bugcheck_code": raw.get("bugcheck_code", "N/A"),
             "bugcheck_name": raw.get("bugcheck_name", "UNKNOWN"),
@@ -292,12 +296,30 @@ def format_analysis_response(raw: dict, filename: str) -> dict:
         "system_info": raw.get("system_info", {}),
         "exception": raw.get("exception"),
         "loaded_modules": raw.get("loaded_modules", []),
+        "threads": raw.get("threads", []),
         "stack_trace": raw.get("stack_trace", []),
         "diagnosis": {
             "known_causes": raw.get("known_causes", []),
             "suggested_fixes": raw.get("suggested_fixes", []),
         },
+        "target_process": raw.get("target_process", "Unknown"),
+        "faulting_process": raw.get("faulting_process", raw.get("target_process", "Unknown")),
+        "debug_session_time": raw.get("debug_session_time", "N/A"),
+        "system_uptime": raw.get("system_uptime", "N/A"),
+        "process_uptime": raw.get("process_uptime", "N/A"),
+        "log_type": raw.get("log_type", "Unknown"),
+        "thread_count": raw.get("thread_count", 0),
+        "module_count": raw.get("module_count", 0),
+        "failure_bucket": raw.get("failure_bucket", "Unknown"),
+        "faulting_thread": raw.get("faulting_thread", "FAULTING_THREAD: N/A"),
+        "stack_core": raw.get("stack_core", "N/A"),
+        "third_party_intervention": raw.get("third_party_intervention", "N/A"),
+        "root_cause_analysis": raw.get("root_cause_analysis", []),
+        "additional_analysis_recommendations": raw.get("additional_analysis_recommendations", []),
+        "recommended_windbg_commands": raw.get("recommended_windbg_commands", []),
+        "recommended_windbg_script": raw.get("recommended_windbg_script", ""),
         "windbg_output": raw.get("windbg_output", ""),
+        "warnings": raw.get("warnings", []),
         "errors": raw.get("errors", []),
     }
 
