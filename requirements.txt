@@ -1,0 +1,24 @@
+# BSOD Analyzer v2 - Python Dependencies
+# Install: pip install -r requirements.txt
+
+# ── Core Framework ──────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# ── HTTP Client (for LLM API calls) ─────────────────────────────────────
+httpx==0.28.1
+
+# ── Data Validation ─────────────────────────────────────────────────────
+pydantic==2.10.6
+
+# ── Dump Analysis ───────────────────────────────────────────────────────
+minidump==0.0.22
+construct==2.10.70
+
+# ── Utilities ───────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+
+# NOTE: weasyprint and pyppeteer are excluded for Vercel compatibility.
+# PDF generation will return HTTP 503 with an installation guide message.
+# To enable PDF locally: pip install weasyprint
