@@ -1,11 +1,19 @@
 {
   "version": 2,
-  "functions": {
-    "api/main.py": {
-      "maxDuration": 60,
-      "memory": 1024
+  "builds": [
+    {
+      "src": "api/main.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxDuration": 60,
+        "memory": 1024
+      }
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
     }
-  },
+  ],
   "rewrites": [
     {
       "source": "/api/(.*)",
