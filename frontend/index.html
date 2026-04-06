@@ -179,113 +179,117 @@
     .step-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     .step.active .step-dot { animation: pulse 1s infinite; }
 
-    /* ── Light Theme for Results ── */
-    .results-section { padding: 0 0 64px; display: none; color: #333; font-family: 'Inter', sans-serif; }
+    /* ── Dark Theme for Results (matching screenshot structure) ── */
+    .results-section { padding: 0 0 64px; display: none; }
     .results-section.visible { display: block; }
     
     .light-card {
-      background: #fff;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 16px 20px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
       margin-bottom: 16px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     }
     
     .flex-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
     .flex-col { display: flex; flex-direction: column; gap: 4px; }
     
     .text-sm { font-size: 0.875rem; }
-    .text-xs { font-size: 0.75rem; color: #64748b; }
-    .text-gray { color: #64748b; }
-    .font-mono { font-family: 'JetBrains Mono', monospace; }
+    .text-xs { font-size: 0.75rem; color: var(--text-muted); }
+    .text-gray { color: var(--text-secondary); }
+    .font-mono { font-family: var(--font-mono); }
     
     .failure-bucket {
-      background: #f8fafc;
-      padding: 12px 16px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      background: var(--bg-secondary);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
       font-size: 0.9rem;
+      color: var(--text-primary);
     }
     
     .info-bar {
-      background: #f8fafc;
-      padding: 12px 16px;
-      border-radius: 6px;
-      border: 1px solid #e2e8f0;
+      background: var(--bg-secondary);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 16px;
+      margin-bottom: 24px;
       font-size: 0.875rem;
+      color: var(--text-primary);
     }
     
     .param-card {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
       margin-bottom: 24px;
     }
     .param-header {
-      padding: 12px 16px;
-      border-bottom: 1px solid #e2e8f0;
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
       font-weight: 600;
       font-size: 0.9rem;
       display: flex;
       align-items: center;
       gap: 8px;
-      color: #334155;
+      color: var(--text-primary);
+      background: var(--bg-secondary);
     }
     .param-row {
-      background: #fff;
-      padding: 16px;
-      border-bottom: 1px solid #f1f5f9;
+      background: var(--bg-card);
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
       display: grid;
       grid-template-columns: 120px 1fr;
       gap: 16px;
     }
     .param-row:last-child { border-bottom: none; }
-    .param-val { color: #2563eb; font-weight: 600; font-family: 'JetBrains Mono', monospace; font-size: 0.9rem; }
-    .param-name { font-weight: 600; color: #1e293b; margin-bottom: 4px; font-size: 0.9rem; }
-    .param-desc { color: #64748b; font-size: 0.85rem; line-height: 1.5; }
+    .param-val { color: var(--accent-blue); font-weight: 600; font-family: var(--font-mono); font-size: 0.9rem; }
+    .param-name { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; font-size: 0.9rem; }
+    .param-desc { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; }
     
     .driver-card {
-      background: #fff;
-      border: 1px solid #fbbf24;
+      background: var(--bg-card);
+      border: 1px solid var(--accent-yellow);
       border-radius: 8px;
       overflow: hidden;
       margin-bottom: 24px;
-      box-shadow: 0 2px 10px rgba(251, 191, 36, 0.1);
+      box-shadow: 0 2px 10px rgba(251, 191, 36, 0.05);
     }
     .driver-header {
-      padding: 12px 16px;
+      padding: 14px 18px;
       font-weight: 600;
       font-size: 0.9rem;
-      color: #d97706;
+      color: var(--accent-yellow);
       display: flex;
       align-items: center;
       gap: 8px;
+      background: rgba(251, 191, 36, 0.05);
+      border-bottom: 1px solid rgba(251, 191, 36, 0.2);
     }
     .driver-item {
-      background: #fff;
-      border: 1px solid #e2e8f0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      margin: 0 16px 16px 16px;
+      margin: 16px;
       padding: 16px;
     }
-    .driver-name { font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #1e293b; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-    .driver-badge { background: #f1f5f9; color: #64748b; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; font-family: 'Inter', sans-serif; }
-    .driver-desc { color: #475569; font-size: 0.85rem; margin-bottom: 12px; }
-    .driver-tip { color: #2563eb; font-size: 0.85rem; }
+    .driver-name { font-family: var(--font-mono); font-weight: 600; color: var(--text-primary); font-size: 0.95rem; display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+    .driver-badge { background: rgba(239, 68, 68, 0.1); color: var(--accent-red); padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: normal; font-family: 'Inter', sans-serif; border: 1px solid rgba(239, 68, 68, 0.2); }
+    .driver-desc { color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px; }
+    .driver-tip { color: var(--accent-blue); font-size: 0.85rem; }
     
     .ai-summary-text {
       font-style: italic;
-      color: #475569;
+      color: var(--text-secondary);
       font-size: 0.95rem;
       margin-bottom: 24px;
       line-height: 1.6;
@@ -301,11 +305,11 @@
     .ai-col-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: #2563eb;
+      color: var(--accent-blue);
       margin-bottom: 16px;
     }
     .ai-col-content {
-      color: #475569;
+      color: var(--text-secondary);
       font-size: 0.9rem;
       line-height: 1.6;
     }
@@ -317,11 +321,10 @@
       margin-bottom: 12px;
     }
 
-    /* Override dark theme for buttons in results */
     .results-header {
       display: flex; align-items: center; justify-content: space-between;
       margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
-      color: #fff; /* Keep title white as it's on dark bg */
+      color: var(--text-primary);
     }
     .results-title { font-size: 1.3rem; font-weight: 700; }
     .results-actions { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -550,65 +553,66 @@
         <div class="results-title">📊 Analysis Results</div>
         <div class="results-actions">
           <button class="btn btn-secondary btn-sm" onclick="openEmailModal()">📧 Email Draft</button>
-          <button class="btn btn-secondary btn-sm" onclick="downloadPDF()">📄 PDF Report</button>
-          <button class="btn btn-secondary btn-sm" onclick="resetAnalyzer()">🔄 New Analysis</button>
+          <button class="btn btn-secondary btn-sm" onclick="resetAnalyzer()">� New Analysis</button>
         </div>
       </div>
 
-      <div class="light-card">
-        <!-- Top Section -->
-        <div class="failure-bucket">
-          <span class="text-gray">Failure Bucket:</span>
-          <span class="font-mono" id="valFailureBucket">0x...</span>
-          <button class="btn btn-sm" style="background:transparent;border:none;cursor:pointer" onclick="navigator.clipboard.writeText(document.getElementById('valFailureBucket').innerText)">📋</button>
-        </div>
-
-        <div class="info-bar">
-          <div class="flex-row">
-            <div><span class="text-gray">Process:</span> <span id="valProcess">System</span></div>
-            <div><span class="text-gray">Symbol:</span> <span class="font-mono" style="color:#2563eb" id="valSymbol">Unknown</span></div>
-          </div>
-          <div><span class="text-gray">Windows:</span> <span id="valWindows">Unknown</span></div>
-        </div>
-
-        <!-- Parameter Analysis -->
-        <div class="param-card">
-          <div class="param-header">
-            <span>🔍 Parameter Analysis</span>
-          </div>
-          <div id="paramRows"></div>
-        </div>
-
-        <!-- AI Analysis Loading -->
+      <div class="analysis-card">
+        <!-- AI Analysis Loading (Moves to top) -->
         <div id="aiLoading" style="display:flex;flex-direction:column;align-items:center;padding:40px;gap:16px;">
-          <div class="spinner" style="border-color:#e2e8f0;border-top-color:#2563eb;"></div>
-          <span id="aiLoadingMsg" style="color:#64748b;">Analyzing with AI...</span>
+          <div class="spinner" style="border-color:var(--border);border-top-color:var(--accent-blue);"></div>
+          <span id="aiLoadingMsg" style="color:var(--text-secondary);">Analyzing with AI...</span>
         </div>
 
-        <!-- AI Output Section -->
-        <div id="aiResult" style="display:none;">
-          <!-- Known Problematic Drivers -->
-          <div class="driver-card" id="driverCard" style="display:none;">
-            <div class="driver-header">
-              <span>⚠️ Known Problematic Drivers Detected</span>
-            </div>
-            <div id="driverList"></div>
+        <!-- Content container hidden until AI finishes -->
+        <div id="finalAnalysisContent" style="display:none;">
+          <!-- Top Section -->
+          <div class="failure-bucket">
+            <span class="text-gray">Failure Bucket:</span>
+            <span class="font-mono" id="valFailureBucket">0x...</span>
+            <button class="btn btn-sm" style="background:transparent;border:none;cursor:pointer;color:var(--text-muted)" onclick="navigator.clipboard.writeText(document.getElementById('valFailureBucket').innerText)">📋</button>
           </div>
 
-          <div class="ai-summary-text" id="aiSummary"></div>
-
-          <div class="ai-cols">
-            <div>
-              <div class="ai-col-title">Probable Cause</div>
-              <div class="ai-col-content" id="aiCause"></div>
+          <div class="info-bar">
+            <div class="flex-row">
+              <div><span class="text-gray">Process:</span> <span id="valProcess">System</span></div>
+              <div><span class="text-gray">Symbol:</span> <span class="font-mono" style="color:var(--accent-blue)" id="valSymbol">Unknown</span></div>
             </div>
-            <div>
-              <div class="ai-col-title">Recommendations</div>
-              <div class="ai-col-content" id="aiRecommendations"></div>
+            <div><span class="text-gray">Windows:</span> <span id="valWindows">Unknown</span></div>
+          </div>
+
+          <!-- Parameter Analysis -->
+          <div class="param-card">
+            <div class="param-header">
+              <span>🔍 Parameter Analysis</span>
+            </div>
+            <div id="paramRows"></div>
+          </div>
+
+          <!-- AI Output Section -->
+          <div id="aiResult">
+            <!-- Known Problematic Drivers -->
+            <div class="driver-card" id="driverCard" style="display:none;">
+              <div class="driver-header">
+                <span>⚠️ Known Problematic Drivers Detected</span>
+              </div>
+              <div id="driverList"></div>
+            </div>
+
+            <div class="ai-summary-text" id="aiSummary"></div>
+
+            <div class="ai-cols">
+              <div>
+                <div class="ai-col-title">Probable Cause</div>
+                <div class="ai-col-content" id="aiCause"></div>
+              </div>
+              <div>
+                <div class="ai-col-title">Recommendations</div>
+                <div class="ai-col-content" id="aiRecommendations"></div>
+              </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
 
@@ -958,9 +962,8 @@ function formatBytes(bytes) {
 // ═══════════════════════════════════════════════════════════════════════
 async function runAIDiagnosis() {
   if (!currentAnalysis) { showToast('No analysis loaded', 'error'); return; }
-  document.getElementById('cardAI').style.display = '';
   document.getElementById('aiLoading').style.display = 'flex';
-  document.getElementById('aiResult').style.display = 'none';
+  document.getElementById('finalAnalysisContent').style.display = 'none';
 
   const msgs = ['Analyzing crash context...', 'Identifying driver patterns...', 'Generating diagnosis...'];
   let mi = 0;
@@ -1025,12 +1028,13 @@ Return JSON with keys: lay_summary, technical_analysis, root_cause, confidence, 
   } catch (err) {
     clearInterval(interval);
     document.getElementById('aiLoading').innerHTML = `<span style="color:var(--accent-red)">⚠ AI 진단 실패: ${err.message}</span><br><small style="color:var(--text-secondary)">Puter.js 로그인이 필요할 수 있습니다. 잠시 후 다시 시도해 주세요.</small>`;
+    document.getElementById('finalAnalysisContent').style.display = 'block'; // Show base results even if AI fails
   }
 }
 
 function renderAIResult(ai) {
   document.getElementById('aiLoading').style.display = 'none';
-  const resultDiv = document.getElementById('aiResult');
+  const resultDiv = document.getElementById('finalAnalysisContent');
   resultDiv.style.display = 'block';
 
   // Handle problematic drivers (simulate using AI output or current state)
