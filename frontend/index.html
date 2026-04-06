@@ -486,6 +486,7 @@
   <a class="nav-logo" href="#"><span>BSOD</span> Analyzer</a>
   <div class="nav-links">
     <button class="nav-link active" onclick="showPage('analyzer')">⚡ Analyzer</button>
+    <button class="nav-link" onclick="showPage('windbg')">💻 !analyze -v</button>
     <button class="nav-link" onclick="showPage('bugchecks')">📋 Bug Checks</button>
     <a class="nav-link" href="/api/docs" target="_blank">📖 API Docs</a>
   </div>
@@ -678,7 +679,18 @@
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════ BUG CHECKS PAGE -->
+<!-- ═══════════════════════════════════════════════════════ WINDBG OUTPUT PAGE -->
+<div id="page-windbg" class="page" style="display:none;">
+  <div class="container">
+    <div class="page-header">
+      <h1>!analyze -v Raw Output</h1>
+      <p>Simulated WinDbg debugger output for deep technical analysis</p>
+    </div>
+    <div class="code-block" id="valWindbgOutput" style="white-space: pre-wrap; font-family: var(--font-mono); font-size: 0.85rem; line-height: 1.4; color: #f1f5f9; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b; max-height: 70vh; overflow-y: auto;">
+      No debugger output available.
+    </div>
+  </div>
+</div>
 <div id="page-bugchecks" class="page">
   <div class="container">
     <div class="page-header">
@@ -1039,6 +1051,8 @@ function renderResults(data) {
   document.getElementById('metaThreadCount').innerText = data.thread_count !== undefined ? `${data.thread_count}` : 'N/A';
   document.getElementById('metaModuleCount').innerText = data.module_count !== undefined ? `${data.module_count}` : 'N/A';
 
+  document.getElementById('valWindbgOutput').innerText = data.windbg_output || 'No raw output available.';
+  
   // Render heuristic insights immediately so the requested sections are available even without AI.
   renderHeuristicInsights(data);
 
@@ -1074,42 +1088,85 @@ async function runAIDiagnosis() {
     const modules = (currentAnalysis.loaded_modules || []).slice(0, 10);
     const diagnosis = currentAnalysis.diagnosis || {};
 
-    const systemPrompt = `You are a senior Windows kernel crash dump analysis expert.
-Analyze the provided crash dump data and return ONLY a valid JSON object.
-Rules:
-1. "failure_bucket": The bugcheck and module (e.g., "BREAKPOINT_80000003_twinapi.appcore.dll!Event::WaitWithFreeUnusedLibraries")
-2. "faulting_thread": Thread ID (e.g., "FAULTING_THREAD: 00004f74")
-3. "stack_summary": High-level trace (e.g., "NtWaitForMultipleObjects -> KERNELBASE!...")
-4. "third_party_modules": List of suspicious third-party DLLs/sys
-5. "problematic_drivers": Array of objects. Each object must have "name" (e.g. "TSFltDrv.sys"), "badge" (e.g. "security", "network", "system"), "vendor" (e.g. "AhnLab V3 Filter Driver"), "description" (bullet point text explaining the issue), "tip" (actionable tip text). If no driver is found, return empty array.
-6. "summary_text": A 1-2 sentence italicized summary explaining the crash simply.
-7. "probable_cause": A detailed paragraph explaining the root cause.
-8. "recommendations": Array of strings with actionable recommendations.
-Respond in Korean (한국어), but keep technical terms and driver names in English.`;
+    const systemPrompt = `당신은 로그 분석 전문가입니다. 첨부된 로그 파일을 기반으로 문제의 근본 원인을 식별하고, 실행 가능한 해결 방안과 재발 방지 대책을 제시해야 합니다. 
+분석 보고서는 아래의 구조에 맞춰 기술적으로 명확하고 실현 가능한 내용을 중심으로 작성하고, 고객사 전달용 이메일 초안을 함께 작성해 주세요. 
+ 
+🔍 1. 로그 개요 
+분석 대상 로그에 대해 다음 정보를 간결하게 설명하세요. 
+- 로그 출처 (시스템/애플리케이션/장비 등) 
+- 로그 수집 시간 범위 
+- 로그 유형 (예: application log, system log, security log 등) 
+- 로그 규모 (라인 수 또는 이벤트 수) 
+- 분석 목적 요약 
+ 
+⚠️ 2. 주요 오류 식별 
+로그에서 탐지된 주요 오류 메시지를 타임스탬프와 함께 목록화하세요. 
+ 
+🧠 3. 오류 분석 
+3.1 핵심 원인별 영향도 분석 
+- **원인 항목 · 주요 관련 드라이버/징후 · 기여도(%)** 3열로 표로 작성하세요.  
+- *기여도*는 각 원인이 전체 문제에 기여한 비중이며 **총합이 100 %**가 되도록 정량화하세요. 
+ 
+3.2 원인 분석 (Cause Analysis) 
+각 오류에 대해 다음 내용을 설명하세요. 
+- 오류 메시지를 기반으로 한 잠재적 근본 원인 
+- 관련된 시스템 구성요소 또는 서비스 
+- 로그 패턴 또는 이벤트 흐름 분석 
+- 오류가 발생한 가능한 시나리오 
+ 
+3.3 영향도 평가 (Impact Assessment) 
+각 오류가 시스템에 미친 영향을 분석하세요. 
+예시 포함: 
+- 서비스 중단 여부 
+- 성능 저하 
+- 데이터 손상 가능성 
+- 사용자 영향 범위 
+- SLA 영향 가능성 	 
+ 
+🛠️ 4. 문제 해결 방안 
+각 주요 오류에 대해 구체적인 해결 방안을 제시하세요. 
+예: 설정 변경, 명령어, 패치 적용, 구성 수정 등 
+가능한 경우 조치의 우선순위를 제안하세요. 
+필요 시 시스템 환경에 따라 고려해야 할 대체 조치도 함께 기술하세요. 
+ 
+🔬 5. 추가 분석 권고 
+현재 로그 분석만으로는 확인이 어려운 영역을 식별하고 다음을 제안하세요. 
+- 추가로 필요한 로그 유형 
+- 시스템 메트릭 수집 (CPU / Memory / Disk / Network) 
+- APM 또는 tracing 분석 
+- 특정 이벤트 패턴 분석 
+- 반복적인 warning/error 패턴 심층 분석 등을 기반으로 심층 분석 제안을 포함하세요. 
+ 
+📧 고객사 전달용 이메일 초안 자동 생성 
+분석이 완료된 후, 고객사에 전달할 이메일을 작성해 주세요. 
+내용은 비전문가도 이해할 수 있도록 구성하며, 기술 보고서와 같은 형식 및 내용으로 작성해주세요. 
+ 
+📌 출력 요구사항 
+- 보고서는 기술 문서 수준의 구조화된 형식으로 작성 
+- 표(Table)를 적극 활용 
+- 근거 기반 분석 중심 
+- 추측보다는 로그 기반 분석을 우선
+- 응답은 반드시 마크다운 형식으로 작성할 것 (JSON 사용 불가)`;
 
-    const userPrompt = `Analyze this Windows crash:
+    const userPrompt = `다음 덤프 로그 정보를 바탕으로 보고서를 작성해주세요:
+[Crash Info]
 - Bug Check: ${crash.bugcheck_code} (${crash.bugcheck_name})
 - Caused By: ${crash.caused_by_driver || 'Unknown'}
-- OS: ${sysInfo.os_version || 'Unknown'}
-- Modules: ${modules.map(m => m.name).join(', ')}
+- OS Version: ${sysInfo.os_version || 'Unknown'}
+- Target Process: ${window.currentAnalysis?.target_process || 'Unknown'}
 
-Return JSON with keys: failure_bucket, faulting_thread, stack_summary, third_party_modules, problematic_drivers, summary_text, probable_cause, recommendations`;
+[!analyze -v Simulated Output]
+${(window.currentAnalysis?.windbg_output || '').substring(0, 3000)}
+
+[Loaded Modules]
+${modules.map(m => m.name).join(', ')}`;
 
     const response = await puter.ai.chat(userPrompt, { model: 'gpt-4o-mini', systemPrompt });
     clearInterval(interval);
 
-    // Parse JSON from response
-    let ai;
-    const text = typeof response === 'string' ? response : (response?.message?.content || response?.content || JSON.stringify(response));
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      ai = JSON.parse(jsonMatch[0]);
-    } else {
-      throw new Error('Could not parse AI response as JSON');
-    }
-
-    currentAIDiagnosis = ai;
-    renderAIResult(ai);
+    const text = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
+    currentAIDiagnosis = { markdown_report: text };
+    renderAIResult(currentAIDiagnosis);
   } catch (err) {
     clearInterval(interval);
     document.getElementById('aiLoading').innerHTML = `<span style="color:var(--accent-red)">⚠ AI 진단 실패: ${err.message}</span><br><small style="color:var(--text-secondary)">Puter.js 로그인이 필요할 수 있습니다. 잠시 후 다시 시도해 주세요.</small>`;
@@ -1132,8 +1189,29 @@ function renderAIResult(ai) {
   document.getElementById('valAiStack').innerText = ai.stack_summary || 'N/A';
   document.getElementById('valAiThirdParty').innerText = ai.third_party_modules || 'N/A';
   
-  // Problematic Drivers Section
-  const drivers = ai.problematic_drivers || [];
+  // AI Markdown Report
+  if (ai.markdown_report) {
+    document.getElementById('aiLegacyCols').style.display = 'block';
+    // Use marked.js or basic replacement for markdown rendering
+    let htmlContent = ai.markdown_report
+      .replace(/^### (.*$)/gim, '<h4 style="color:#3b82f6;margin-top:16px;margin-bottom:8px;">$1</h4>')
+      .replace(/^## (.*$)/gim, '<h3 style="color:#06b6d4;margin-top:24px;margin-bottom:12px;font-size:1.2rem;">$1</h3>')
+      .replace(/^# (.*$)/gim, '<h2 style="color:#f1f5f9;margin-top:24px;margin-bottom:16px;">$1</h2>')
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>')
+      .replace(/\|(.+)\|/g, function(match) {
+        return '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;margin:16px 0;">' + 
+               match.split('<br>').map(row => {
+                 if(row.includes('---')) return '';
+                 let cells = row.split('|').filter(c => c.trim() !== '');
+                 return `<tr>${cells.map(c => `<td style="border:1px solid #1e293b;padding:8px;">${c.trim()}</td>`).join('')}</tr>`;
+               }).join('') + '</table></div>';
+      });
+    document.getElementById('aiLegacyCols').innerHTML = `<div style="color:var(--text-secondary);line-height:1.6;">${htmlContent}</div>`;
+  } else {
+    // Problematic Drivers Section
+    const drivers = ai.problematic_drivers || [];
   if (drivers.length > 0) {
     document.getElementById('aiProblematicDriversContainer').style.display = 'block';
     document.getElementById('aiProblematicDriversList').innerHTML = drivers.map(d => `
@@ -1161,6 +1239,7 @@ function renderAIResult(ai) {
     document.getElementById('aiRecommendations').innerHTML = recs.length > 0 
       ? '<ul>' + recs.map(r => `<li>${r}</li>`).join('') + '</ul>'
       : 'N/A';
+  }
   }
 }
 
