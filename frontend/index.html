@@ -590,7 +590,7 @@
           </div>
 
           <!-- Detailed Metadata -->
-          <div style="margin-top: 32px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b;">
+          <div id="aiMajorErrors" style="margin-top: 32px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b; display: none;">
             <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">주요 오류 식별</h3>
             
             <div style="margin-bottom: 16px;">
@@ -962,7 +962,7 @@ function renderHeuristicInsights(data) {
   document.getElementById('aiMajorErrors').style.display = 'block';
   document.getElementById('valAiBucket').innerText = data.failure_bucket || `${crash.bugcheck_name || 'UNKNOWN'}_${crash.caused_by_driver || 'Unknown'}`;
   document.getElementById('valAiThread').innerText = data.faulting_thread || 'FAULTING_THREAD: N/A';
-  document.getElementById('valAiProcess').innerText = data.faulting_process || data.target_process || 'N/A';
+  document.getElementById('metaTargetProcess').innerText = data.faulting_process || data.target_process || 'N/A';
   document.getElementById('valAiStack').innerText = data.stack_core || 'N/A';
   document.getElementById('valAiThirdParty').innerText = data.third_party_intervention || 'N/A';
 
@@ -1135,7 +1135,7 @@ function renderAIResult(ai) {
   document.getElementById('aiMajorErrors').style.display = 'block';
   document.getElementById('valAiBucket').innerText = ai.failure_bucket || `${crash.bugcheck_name || 'UNKNOWN_BUGCHECK'}_${crash.caused_by_driver || 'Unknown'}`;
   document.getElementById('valAiThread').innerText = ai.faulting_thread || 'N/A';
-  document.getElementById('valAiProcess').innerText = window.currentAnalysis?.target_process || 'N/A';
+  document.getElementById('metaTargetProcess').innerText = window.currentAnalysis?.target_process || 'N/A';
   document.getElementById('valAiStack').innerText = ai.stack_summary || 'N/A';
   document.getElementById('valAiThirdParty').innerText = ai.third_party_modules || 'N/A';
   
@@ -1329,9 +1329,6 @@ function resetAnalyzer() {
   currentAnalysis = null; currentAIDiagnosis = null;
   document.getElementById('resultsSection').classList.remove('visible');
   document.getElementById('progressContainer').classList.remove('visible');
-  document.getElementById('cardAI').style.display = 'none';
-  document.getElementById('cardException').style.display = 'none';
-  document.getElementById('cardWindbg').style.display = 'none';
   document.getElementById('fileInput').value = '';
 }
 </script>
