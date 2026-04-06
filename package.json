@@ -1,0 +1,8 @@
+{
+  "name": "bsod-analyzer",
+  "version": "1.0.0",
+  "description": "BSOD Analyzer Frontend",
+  "scripts": {
+    "build": "echo 'No frontend build required'"
+  }
+}
