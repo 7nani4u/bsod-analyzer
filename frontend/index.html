@@ -639,8 +639,8 @@ async function processFile(file) {
 
   try {
     let analysisResult;
-    if (file.size <= 50 * 1024 * 1024) {
-      // Direct upload for files ≤ 50MB
+    if (file.size <= 4 * 1024 * 1024) {
+      // Direct upload for files ≤ 4MB
       analysisResult = await directUpload(file);
     } else {
       // Chunked upload for large files
@@ -761,7 +761,7 @@ async function chunkedUpload(file) {
   // Analyze
   setStep('parse', 'active');
   setProgress(80, 'Analyzing dump file...');
-  const analyzeResp = await fetch(`${API_BASE}/api/analyze/by-upload-id/${upload_id}`);
+  const analyzeResp = await fetch(`${API_BASE}/api/analyze/by-upload-id/${upload_id}`, { method: 'POST' });
   if (!analyzeResp.ok) {
     const e = await analyzeResp.json().catch(() => ({}));
     throw new Error(e.detail || 'Analysis failed');
