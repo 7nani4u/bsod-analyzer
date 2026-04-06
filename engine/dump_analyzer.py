@@ -111,6 +111,15 @@ class AnalysisResult:
     # Threads
     threads: list[dict] = field(default_factory=list)
 
+    # UI Metadata
+    target_process: str = "Unknown"
+    debug_session_time: str = "Unknown"
+    system_uptime: str = "Unknown"
+    process_uptime: str = "Unknown"
+    log_type: str = "Unknown"
+    thread_count: int = 0
+    module_count: int = 0
+
     # Suggested fixes
     suggested_fixes: list[str] = field(default_factory=list)
     known_causes: list[str] = field(default_factory=list)
@@ -145,6 +154,7 @@ DMP32_MACHINE_IMAGE_TYPE = 0x20   # ULONG
 DMP32_NUMBER_PROCESSORS  = 0x24   # ULONG
 DMP32_BUGCHECK_CODE      = 0x28   # ULONG
 DMP32_BUGCHECK_PARAMS    = 0x2C   # 4 x ULONG
+DMP32_SYSTEM_UP_TIME     = 0x320  # LARGE_INTEGER (100-ns intervals)
 DMP32_DUMP_TYPE          = 0xF88  # ULONG
 DMP32_COMMENT            = 0x820  # 128 bytes
 
@@ -157,6 +167,7 @@ DMP64_MACHINE_IMAGE_TYPE = 0x30   # ULONG
 DMP64_NUMBER_PROCESSORS  = 0x34   # ULONG
 DMP64_BUGCHECK_CODE      = 0x38   # ULONG
 DMP64_BUGCHECK_PARAMS    = 0x40   # 4 x ULONGLONG
+DMP64_SYSTEM_UP_TIME     = 0x338  # ULONGLONG (100-ns intervals)
 DMP64_DUMP_TYPE          = 0xF98  # ULONG
 DMP64_COMMENT            = 0xFB0  # 128 bytes
 
@@ -341,6 +352,10 @@ class KernelDumpParser:
         params = [_read_u32(data, DMP32_BUGCHECK_PARAMS + i * 4) for i in range(4)]
         result.bugcheck_parameters = params
 
+        if len(data) >= DMP32_SYSTEM_UP_TIME + 8:
+            uptime_100ns = _read_u64(data, DMP32_SYSTEM_UP_TIME)
+            result.system_info["system_uptime_sec"] = uptime_100ns // 10_000_000
+
         dump_type_val = _read_u32(data, DMP32_DUMP_TYPE) if len(data) > DMP32_DUMP_TYPE + 4 else 0
         result.dump_type = DUMP_TYPE_NAMES.get(dump_type_val, f"Type {dump_type_val}")
 
@@ -370,6 +385,10 @@ class KernelDumpParser:
         result.bugcheck_code = bugcheck
         params = [_read_u64(data, DMP64_BUGCHECK_PARAMS + i * 8) for i in range(4)]
         result.bugcheck_parameters = params
+
+        if len(data) >= DMP64_SYSTEM_UP_TIME + 8:
+            uptime_100ns = _read_u64(data, DMP64_SYSTEM_UP_TIME)
+            result.system_info["system_uptime_sec"] = uptime_100ns // 10_000_000
 
         if len(data) > DMP64_DUMP_TYPE + 4:
             dump_type_val = _read_u32(data, DMP64_DUMP_TYPE)
@@ -722,7 +741,66 @@ class DumpAnalyzer:
             result.errors.append(f"Unexpected analysis error: {exc}")
 
         result.analysis_time = round(time.time() - start, 3)
+        self._enrich_ui_metadata(result)
         return result.to_dict()
+
+    def _enrich_ui_metadata(self, result: AnalysisResult) -> None:
+        import datetime
+        # log_type
+        if "MDMP" in result.dump_type or "User-mode" in result.dump_type:
+            result.log_type = "WinDbg 기반 User Mini Dump Analysis"
+        else:
+            result.log_type = "WinDbg 기반 Kernel Dump Analysis"
+
+        # thread_count, module_count
+        result.thread_count = len(result.threads)
+        result.module_count = len(result.loaded_modules)
+
+        # target_process
+        if "process_id" in result.system_info:
+            pid = result.system_info["process_id"]
+            if result.loaded_modules:
+                first_mod = result.loaded_modules[0]["name"]
+                if first_mod.lower().endswith(".exe"):
+                    result.target_process = f"{first_mod} (PID: {pid})"
+                else:
+                    result.target_process = f"PID: {pid}"
+            else:
+                result.target_process = f"PID: {pid}"
+        else:
+            result.target_process = "System"
+
+        # debug_session_time
+        ts = result.system_info.get("timestamp")
+        if ts:
+            try:
+                dt = datetime.datetime.fromtimestamp(ts, tz=datetime.timezone(datetime.timedelta(hours=9)))
+                result.debug_session_time = dt.strftime("%Y-%m-%d %H:%M:%S (UTC+9)")
+            except Exception:
+                result.debug_session_time = "Unknown"
+        else:
+            result.debug_session_time = "N/A"
+
+        # process_uptime
+        create_time = result.system_info.get("process_create_time")
+        if ts and create_time and create_time > 0 and ts >= create_time:
+            uptime_sec = ts - create_time
+            h = uptime_sec // 3600
+            m = (uptime_sec % 3600) // 60
+            s = uptime_sec % 60
+            result.process_uptime = f"{h}시간 {m}분 {s}초"
+        else:
+            result.process_uptime = "N/A"
+            
+        # system_uptime
+        sys_uptime = result.system_info.get("system_uptime_sec")
+        if sys_uptime:
+            h = sys_uptime // 3600
+            m = (sys_uptime % 3600) // 60
+            s = sys_uptime % 60
+            result.system_uptime = f"{h}시간 {m}분 {s}초"
+        else:
+            result.system_uptime = "N/A"
 
     def _generate_simulated_windbg_output(self, result: AnalysisResult) -> None:
         """
@@ -842,6 +920,7 @@ class DumpAnalyzer:
             result.errors.append(f"Unexpected analysis error: {exc}")
 
         result.analysis_time = round(time.time() - start, 3)
+        self._enrich_ui_metadata(result)
         return result.to_dict()
 
     def _dispatch(self, data: bytes, result: AnalysisResult) -> None:

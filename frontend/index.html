@@ -248,11 +248,11 @@
       padding: 16px 18px;
       border-bottom: 1px solid var(--border);
       display: grid;
-      grid-template-columns: 120px 1fr;
-      gap: 16px;
+      grid-template-columns: minmax(180px, max-content) 1fr;
+      gap: 24px;
     }
     .param-row:last-child { border-bottom: none; }
-    .param-val { color: var(--accent-blue); font-weight: 600; font-family: var(--font-mono); font-size: 0.9rem; }
+    .param-val { color: var(--accent-blue); font-weight: 600; font-family: var(--font-mono); font-size: 0.9rem; word-break: break-all; }
     .param-name { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; font-size: 0.9rem; }
     .param-desc { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; }
     
@@ -587,6 +587,38 @@
               <span>🔍 Parameter Analysis</span>
             </div>
             <div id="paramRows"></div>
+          </div>
+
+          <!-- Detailed Metadata -->
+          <div style="margin-top: 32px; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">대상 프로세스</div>
+              <div id="metaTargetProcess" class="font-mono" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">디버그 세션 시각</div>
+              <div id="metaSessionTime" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">시스템 업타임</div>
+              <div id="metaSysUptime" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">프로세스 업타임</div>
+              <div id="metaProcUptime" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">로그 유형</div>
+              <div id="metaLogType" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">스레드 수</div>
+              <div id="metaThreadCount" style="color: var(--text-primary);">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">모듈 수</div>
+              <div id="metaModuleCount" style="color: var(--text-primary);">N/A</div>
+            </div>
           </div>
 
           <!-- AI Output Section -->
@@ -945,6 +977,15 @@ function renderResults(data) {
       </div>
     </div>
   `).join('');
+
+  // Detailed Metadata Update
+  document.getElementById('metaTargetProcess').innerText = data.target_process || 'N/A';
+  document.getElementById('metaSessionTime').innerText = data.debug_session_time || 'N/A';
+  document.getElementById('metaSysUptime').innerText = data.system_uptime || 'N/A';
+  document.getElementById('metaProcUptime').innerText = data.process_uptime || 'N/A';
+  document.getElementById('metaLogType').innerText = data.log_type || 'N/A';
+  document.getElementById('metaThreadCount').innerText = data.thread_count !== undefined ? `${data.thread_count}` : 'N/A';
+  document.getElementById('metaModuleCount').innerText = data.module_count !== undefined ? `${data.module_count}` : 'N/A';
 
   // Auto-start AI Diagnosis
   runAIDiagnosis();
