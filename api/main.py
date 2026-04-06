@@ -50,7 +50,9 @@ logger = logging.getLogger("bsod_analyzer")
 # Constants
 # ---------------------------------------------------------------------------
 MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024   # 2 GB
-CHUNK_SIZE_LIMIT = 25 * 1024 * 1024       # 25 MB per chunk
+# Vercel serverless hard limit: 4.5 MB per request body
+# We use 4 MB chunks to stay safely under the limit
+CHUNK_SIZE_LIMIT = 4 * 1024 * 1024        # 4 MB per chunk (Vercel safe limit)
 TEMP_DIR = Path(tempfile.gettempdir()) / "bsod_analyzer"
 TEMP_DIR.mkdir(exist_ok=True)
 
@@ -255,12 +257,9 @@ def cleanup_temp_file(path: Path) -> None:
         pass
 
 def _get_chunk_size(file_size: int) -> int:
-    if file_size <= 100 * 1024 * 1024:
-        return 5 * 1024 * 1024   # 5 MB
-    elif file_size <= 500 * 1024 * 1024:
-        return 10 * 1024 * 1024  # 10 MB
-    else:
-        return 20 * 1024 * 1024  # 20 MB
+    # Vercel serverless enforces a 4.5 MB request body limit.
+    # All chunks must be <= 4 MB regardless of file size.
+    return 4 * 1024 * 1024  # 4 MB — safe for Vercel Pro (4.5 MB limit)
 
 async def _call_llm(messages: list, response_format: Optional[dict] = None) -> str:
     """Call the LLM API (server-side, optional). Falls back to Puter.js client-side."""
@@ -409,8 +408,23 @@ async def upload_chunk(upload_id: str, part_number: int, request: Request):
         )
 
     chunk_data = await request.body()
+    if not chunk_data:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Empty chunk body received for part {part_number}. "
+                   f"Vercel enforces a 4.5 MB request body limit. "
+                   f"Ensure chunk size <= 4 MB."
+        )
     if len(chunk_data) > CHUNK_SIZE_LIMIT:
-        raise HTTPException(status_code=413, detail=f"Chunk too large. Maximum: {CHUNK_SIZE_LIMIT // 1024**2} MB")
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Chunk {part_number} too large ({len(chunk_data) // 1024 // 1024} MB). "
+                f"Maximum allowed: {CHUNK_SIZE_LIMIT // 1024 // 1024} MB. "
+                f"Vercel serverless enforces a 4.5 MB request body limit. "
+                f"Reduce chunk size to 4 MB or less."
+            )
+        )
 
     # Save chunk to disk
     chunk_path = Path(session["session_dir"]) / f"part_{part_number:05d}"
@@ -528,11 +542,12 @@ async def upload_abort(upload_id: str):
 @app.post(
     "/api/analyze",
     tags=["analysis"],
-    summary="Analyze a dump file (direct upload, max 512MB)",
+    summary="Analyze a dump file (direct upload, max 4MB on Vercel)",
     description="""
 Upload and analyze a Windows crash dump file directly.
 
-For files larger than 512MB, use the chunked upload endpoints first, then call `/api/analyze/by-upload-id`.
+**⚠️ Vercel Limitation:** Vercel serverless enforces a **4.5 MB request body limit**.
+For files larger than 4 MB, use the chunked upload endpoints (`/api/upload/*`) instead.
 
 **Supported formats:**
 - `.dmp` — Windows kernel minidump (64-bit or 32-bit)
@@ -544,7 +559,7 @@ For files larger than 512MB, use the chunked upload endpoints first, then call `
     responses={
         200: {"description": "Analysis successful"},
         400: {"description": "Invalid file type or empty file"},
-        413: {"description": "File too large (use chunked upload for files > 512MB)"},
+        413: {"description": "File too large: use chunked upload for files > 4 MB on Vercel"},
         500: {"description": "Analysis engine error"},
     },
 )
@@ -555,10 +570,16 @@ async def analyze_dump(file: UploadFile = File(..., description="Windows dump fi
 
     if file_size == 0:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
-    if file_size > 512 * 1024 * 1024:
+    # Vercel hard limit: 4.5 MB. Reject anything over 4 MB with a clear message.
+    if file_size > 4 * 1024 * 1024:
         raise HTTPException(
             status_code=413,
-            detail="File exceeds 512MB direct upload limit. Use /api/upload/* chunked upload endpoints."
+            detail=(
+                f"File ({file_size // 1024 // 1024} MB) exceeds Vercel's 4.5 MB request body limit. "
+                f"Use the chunked upload flow: POST /api/upload/init → "
+                f"POST /api/upload/chunk/{{id}} (4 MB chunks) → "
+                f"POST /api/upload/complete → GET /api/analyze/by-upload-id/{{id}}"
+            )
         )
 
     temp_path = TEMP_DIR / f"dump_{uuid.uuid4().hex}.dmp"
