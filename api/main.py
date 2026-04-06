@@ -53,11 +53,62 @@ MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024   # 2 GB
 # Vercel serverless hard limit: 4.5 MB per request body
 # We use 4 MB chunks to stay safely under the limit
 CHUNK_SIZE_LIMIT = 4 * 1024 * 1024        # 4 MB per chunk (Vercel safe limit)
-TEMP_DIR = Path(tempfile.gettempdir()) / "bsod_analyzer"
-TEMP_DIR.mkdir(exist_ok=True)
 
-# In-memory upload session store (use Redis in production)
-UPLOAD_SESSIONS: Dict[str, Dict] = {}
+# ---------------------------------------------------------------------------
+# Vercel-compatible storage helpers
+# ---------------------------------------------------------------------------
+# Vercel serverless functions are EPHEMERAL and STATELESS:
+#   1. Each invocation may run in a different container → in-memory dicts are lost
+#   2. /tmp is the ONLY writable directory (max ~512 MB per invocation)
+#   3. Files written to /tmp in one invocation ARE NOT visible in another
+#
+# Architecture decision:
+#   - Session metadata is stored as a JSON file in /tmp/bsod_<upload_id>/session.json
+#   - Each chunk is stored as /tmp/bsod_<upload_id>/part_NNNNN
+#   - The assembled file is /tmp/bsod_<upload_id>/assembled.dmp
+#   - UPLOAD_SESSIONS dict is only used as a fast in-process cache;
+#     every read falls back to disk if the key is missing (cross-invocation safe)
+#
+# IMPORTANT: Because Vercel does NOT share /tmp across invocations, large
+# multi-chunk uploads (>512 MB) will fail when chunks land on different
+# containers. For production use of 2 GB uploads, use a persistent store
+# (e.g., Vercel KV, Redis, or S3 presigned URLs).
+
+UPLOAD_SESSIONS: Dict[str, Dict] = {}  # in-process cache only
+
+
+def _get_session_dir(upload_id: str) -> Path:
+    """Return the /tmp directory for this upload session."""
+    d = Path(tempfile.gettempdir()) / f"bsod_{upload_id}"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def _save_session(session: dict) -> None:
+    """Persist session metadata to disk so other invocations can read it."""
+    session_dir = _get_session_dir(session["upload_id"])
+    session_file = session_dir / "session.json"
+    # Convert Path objects to strings for JSON serialisation
+    serialisable = {k: str(v) if isinstance(v, Path) else v for k, v in session.items()}
+    session_file.write_text(json.dumps(serialisable))
+
+
+def _load_session(upload_id: str) -> Optional[Dict]:
+    """Load session from in-process cache or fall back to disk."""
+    if upload_id in UPLOAD_SESSIONS:
+        return UPLOAD_SESSIONS[upload_id]
+    session_file = Path(tempfile.gettempdir()) / f"bsod_{upload_id}" / "session.json"
+    if session_file.exists():
+        try:
+            session = json.loads(session_file.read_text())
+            UPLOAD_SESSIONS[upload_id] = session  # warm the cache
+            return session
+        except Exception:
+            pass
+    return None
+
+
+TEMP_DIR = Path(tempfile.gettempdir())  # base /tmp — always exists on Vercel
 
 # LLM is handled client-side via Puter.js (no API key required)
 # Server-side LLM is optional; set FORGE_API_KEY to enable it
@@ -355,11 +406,14 @@ async def upload_init(req: UploadInitRequest):
     import math
     total_chunks = math.ceil(req.file_size / chunk_size)
 
-    # Create temp directory for this upload
-    session_dir = TEMP_DIR / upload_id
-    session_dir.mkdir(exist_ok=True)
+    # Create temp directory for this upload — /tmp is writable on Vercel
+    try:
+        session_dir = _get_session_dir(upload_id)
+    except Exception as exc:
+        logger.error(f"Failed to create session directory: {exc}")
+        raise HTTPException(status_code=500, detail=f"Could not create upload session directory: {exc}")
 
-    UPLOAD_SESSIONS[upload_id] = {
+    session = {
         "upload_id": upload_id,
         "filename": req.filename,
         "file_size": req.file_size,
@@ -371,13 +425,19 @@ async def upload_init(req: UploadInitRequest):
         "created_at": time.time(),
         "expires_at": time.time() + 86400,  # 24h
     }
+    UPLOAD_SESSIONS[upload_id] = session
+    # Persist to disk so other Vercel invocations can find this session
+    try:
+        _save_session(session)
+    except Exception as exc:
+        logger.warning(f"Could not persist session to disk: {exc}")
 
     logger.info(f"Upload session created: id={upload_id}, file={req.filename!r}, size={req.file_size:,}")
     return UploadInitResponse(
         upload_id=upload_id,
         chunk_size=chunk_size,
         total_chunks=total_chunks,
-        expires_at=UPLOAD_SESSIONS[upload_id]["expires_at"],
+        expires_at=session["expires_at"],
     )
 
 @app.post(
@@ -396,9 +456,9 @@ Chunks can be retried safely — uploading the same part number again overwrites
     """,
 )
 async def upload_chunk(upload_id: str, part_number: int, request: Request):
-    session = UPLOAD_SESSIONS.get(upload_id)
+    session = _load_session(upload_id)
     if not session:
-        raise HTTPException(status_code=404, detail=f"Upload session '{upload_id}' not found or expired")
+        raise HTTPException(status_code=404, detail=f"Upload session '{upload_id}' not found or expired. On Vercel, sessions may be lost between invocations. Please start a new upload.")
     if time.time() > session["expires_at"]:
         raise HTTPException(status_code=410, detail="Upload session has expired")
     if part_number < 1 or part_number > session["total_chunks"]:
@@ -426,13 +486,26 @@ async def upload_chunk(upload_id: str, part_number: int, request: Request):
             )
         )
 
-    # Save chunk to disk
-    chunk_path = Path(session["session_dir"]) / f"part_{part_number:05d}"
-    chunk_path.write_bytes(chunk_data)
+    # Save chunk to disk — /tmp is writable on Vercel
+    session_dir = Path(session["session_dir"])
+    try:
+        session_dir.mkdir(parents=True, exist_ok=True)
+        chunk_path = session_dir / f"part_{part_number:05d}"
+        chunk_path.write_bytes(chunk_data)
+    except Exception as exc:
+        logger.error(f"Failed to write chunk {part_number}: {exc}")
+        raise HTTPException(status_code=500, detail=f"Failed to save chunk {part_number}: {exc}")
 
     if part_number not in session["completed_parts"]:
         session["completed_parts"].append(part_number)
     session["completed_parts"].sort()
+
+    # Persist updated session to disk
+    UPLOAD_SESSIONS[upload_id] = session
+    try:
+        _save_session(session)
+    except Exception as exc:
+        logger.warning(f"Could not persist session after chunk {part_number}: {exc}")
 
     progress = len(session["completed_parts"]) / session["total_chunks"] * 100
     logger.info(f"Chunk received: upload={upload_id}, part={part_number}, progress={progress:.1f}%")
@@ -452,7 +525,7 @@ async def upload_chunk(upload_id: str, part_number: int, request: Request):
     description="Returns the current status of an upload session, including completed parts. Use this to resume interrupted uploads.",
 )
 async def upload_status(upload_id: str):
-    session = UPLOAD_SESSIONS.get(upload_id)
+    session = _load_session(upload_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Upload session '{upload_id}' not found")
     return {
@@ -477,25 +550,44 @@ All chunks must be uploaded before calling this endpoint. The assembled file is 
     """,
 )
 async def upload_complete(req: CompleteUploadRequest):
-    session = UPLOAD_SESSIONS.get(req.upload_id)
+    session = _load_session(req.upload_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Upload session '{req.upload_id}' not found")
 
-    missing = set(range(1, session["total_chunks"] + 1)) - set(session["completed_parts"])
+    session_dir = Path(session["session_dir"])
+
+    # Check which parts actually exist on disk (cross-invocation safe)
+    existing_parts = set()
+    if session_dir.exists():
+        for p in session_dir.iterdir():
+            if p.name.startswith("part_"):
+                try:
+                    existing_parts.add(int(p.name.split("_")[1]))
+                except ValueError:
+                    pass
+
+    # Merge disk state with session metadata (handles cross-invocation gaps)
+    all_parts = existing_parts | set(session["completed_parts"])
+    missing = set(range(1, session["total_chunks"] + 1)) - all_parts
     if missing:
         raise HTTPException(
             status_code=400,
-            detail=f"Missing chunks: {sorted(missing)[:10]}{'...' if len(missing) > 10 else ''}"
+            detail=f"Missing chunks: {sorted(missing)[:10]}{'...' if len(missing) > 10 else ''}. "
+                   f"On Vercel, /tmp is not shared across invocations — if chunks were uploaded to "
+                   f"different containers they will be missing. Consider using a smaller file or a "
+                   f"persistent storage backend."
         )
 
-    # Assemble chunks
-    output_path = TEMP_DIR / f"assembled_{req.upload_id}.dmp"
-    session_dir = Path(session["session_dir"])
-
-    with open(output_path, "wb") as out:
-        for i in range(1, session["total_chunks"] + 1):
-            chunk_path = session_dir / f"part_{i:05d}"
-            out.write(chunk_path.read_bytes())
+    # Assemble chunks inside the session directory
+    output_path = session_dir / "assembled.dmp"
+    try:
+        with open(output_path, "wb") as out:
+            for i in range(1, session["total_chunks"] + 1):
+                chunk_path = session_dir / f"part_{i:05d}"
+                out.write(chunk_path.read_bytes())
+    except Exception as exc:
+        output_path.unlink(missing_ok=True)
+        raise HTTPException(status_code=500, detail=f"Failed to assemble chunks: {exc}")
 
     # Verify size
     actual_size = output_path.stat().st_size
@@ -506,10 +598,20 @@ async def upload_complete(req: CompleteUploadRequest):
             detail=f"Size mismatch: expected {session['file_size']}, got {actual_size}"
         )
 
-    # Compute SHA-256
-    sha256 = hashlib.sha256(output_path.read_bytes()).hexdigest()
+    # Compute SHA-256 (stream to avoid loading 2 GB into memory)
+    h = hashlib.sha256()
+    with open(output_path, "rb") as f:
+        for block in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(block)
+    sha256 = h.hexdigest()
+
     session["assembled_path"] = str(output_path)
     session["sha256_actual"] = sha256
+    UPLOAD_SESSIONS[req.upload_id] = session
+    try:
+        _save_session(session)
+    except Exception as exc:
+        logger.warning(f"Could not persist assembled session: {exc}")
 
     logger.info(f"Upload complete: id={req.upload_id}, size={actual_size:,}, sha256={sha256[:16]}...")
     return CompleteUploadResponse(
@@ -527,12 +629,11 @@ async def upload_complete(req: CompleteUploadRequest):
     summary="Abort and clean up an upload session",
 )
 async def upload_abort(upload_id: str):
-    session = UPLOAD_SESSIONS.pop(upload_id, None)
+    session = _load_session(upload_id)
+    UPLOAD_SESSIONS.pop(upload_id, None)
     if session:
         import shutil
         shutil.rmtree(session["session_dir"], ignore_errors=True)
-        assembled = Path(TEMP_DIR / f"assembled_{upload_id}.dmp")
-        assembled.unlink(missing_ok=True)
     return {"upload_id": upload_id, "aborted": True}
 
 # ---------------------------------------------------------------------------
@@ -603,7 +704,7 @@ async def analyze_dump(file: UploadFile = File(..., description="Windows dump fi
     description="Analyze a dump file that was uploaded via the chunked upload endpoints. Call `/api/upload/complete` first.",
 )
 async def analyze_by_upload_id(upload_id: str):
-    session = UPLOAD_SESSIONS.get(upload_id)
+    session = _load_session(upload_id)
     if not session:
         raise HTTPException(status_code=404, detail=f"Upload session '{upload_id}' not found")
 
@@ -1219,7 +1320,7 @@ async def pdf_generate(req: PDFReportRequest):
 )
 async def pdf_preview_html(upload_id: str):
     """Returns the HTML that would be rendered as PDF — useful for debugging layout."""
-    session = UPLOAD_SESSIONS.get(upload_id)
+    session = _load_session(upload_id)
     if not session or not session.get("assembled_path"):
         raise HTTPException(status_code=404, detail="Upload session not found or incomplete")
 
