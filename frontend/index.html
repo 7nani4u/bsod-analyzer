@@ -200,61 +200,61 @@
     .font-mono { font-family: var(--font-mono); }
     
     .failure-bucket {
-      background: var(--bg-secondary);
+      background: #0f172a;
       padding: 14px 18px;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border: 1px solid #1e293b;
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 16px;
       font-size: 0.9rem;
-      color: var(--text-primary);
+      color: #f1f5f9;
     }
     
     .info-bar {
-      background: var(--bg-secondary);
+      background: #0f172a;
       padding: 14px 18px;
       border-radius: 8px;
-      border: 1px solid var(--border);
+      border: 1px solid #1e293b;
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 24px;
       font-size: 0.875rem;
-      color: var(--text-primary);
+      color: #f1f5f9;
     }
     
     .param-card {
-      background: var(--bg-card);
-      border: 1px solid var(--border);
+      background: #0f172a;
+      border: 1px solid #1e293b;
       border-radius: 8px;
       overflow: hidden;
       margin-bottom: 24px;
     }
     .param-header {
       padding: 14px 18px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #1e293b;
       font-weight: 600;
       font-size: 0.9rem;
       display: flex;
       align-items: center;
       gap: 8px;
-      color: var(--text-primary);
-      background: var(--bg-secondary);
+      color: #f1f5f9;
+      background: #0f172a;
     }
     .param-row {
-      background: var(--bg-card);
+      background: #0f172a;
       padding: 16px 18px;
-      border-bottom: 1px solid var(--border);
+      border-bottom: 1px solid #1e293b;
       display: grid;
       grid-template-columns: minmax(180px, max-content) 1fr;
       gap: 24px;
     }
     .param-row:last-child { border-bottom: none; }
-    .param-val { color: var(--accent-blue); font-weight: 600; font-family: var(--font-mono); font-size: 0.9rem; word-break: break-all; }
-    .param-name { font-weight: 600; color: var(--text-primary); margin-bottom: 4px; font-size: 0.9rem; }
-    .param-desc { color: var(--text-secondary); font-size: 0.85rem; line-height: 1.5; }
+    .param-val { color: #06b6d4; font-weight: 600; font-family: var(--font-mono); font-size: 0.9rem; word-break: break-all; }
+    .param-name { font-weight: 600; color: #f1f5f9; margin-bottom: 4px; font-size: 0.9rem; }
+    .param-desc { color: #64748b; font-size: 0.85rem; line-height: 1.5; }
     
     .driver-card {
       background: var(--bg-card);
@@ -305,7 +305,7 @@
     .ai-col-title {
       font-size: 1.1rem;
       font-weight: 600;
-      color: var(--accent-blue);
+      color: #06b6d4;
       margin-bottom: 16px;
     }
     .ai-col-content {
@@ -590,50 +590,75 @@
           </div>
 
           <!-- Detailed Metadata -->
-          <div style="margin-top: 32px; padding: 20px; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border);">
+          <div style="margin-top: 32px; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid #1e293b;">
+            <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">주요 오류 식별</h3>
+            
             <div style="margin-bottom: 16px;">
-              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">대상 프로세스</div>
-              <div id="metaTargetProcess" class="font-mono" style="color: var(--text-primary);">N/A</div>
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">실패 버킷</div>
+              <div id="valAiBucket" class="font-mono" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">문제 스레드</div>
+              <div id="valAiThread" class="font-mono" style="color: #f1f5f9;">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">대상 프로세스</div>
+              <div id="metaTargetProcess" class="font-mono" style="color: #f1f5f9;">N/A</div>
+            </div>
+            <div style="margin-bottom: 16px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">스택 핵심</div>
+              <div id="valAiStack" style="color: #f1f5f9; line-height: 1.5;">N/A</div>
+            </div>
+            <div style="margin-bottom: 24px;">
+              <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">제3자 개입 흔적</div>
+              <div id="valAiThirdParty" style="color: #f1f5f9; line-height: 1.5;">N/A</div>
+            </div>
+            
+            <hr style="border: none; border-top: 1px solid #1e293b; margin-bottom: 24px;">
+
+            <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">디버그 세션 시각</div>
-              <div id="metaSessionTime" style="color: var(--text-primary);">N/A</div>
+              <div id="metaSessionTime" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">시스템 업타임</div>
-              <div id="metaSysUptime" style="color: var(--text-primary);">N/A</div>
+              <div id="metaSysUptime" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">프로세스 업타임</div>
-              <div id="metaProcUptime" style="color: var(--text-primary);">N/A</div>
+              <div id="metaProcUptime" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">로그 유형</div>
-              <div id="metaLogType" style="color: var(--text-primary);">N/A</div>
+              <div id="metaLogType" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">스레드 수</div>
-              <div id="metaThreadCount" style="color: var(--text-primary);">N/A</div>
+              <div id="metaThreadCount" style="color: #f1f5f9;">N/A</div>
             </div>
             <div style="margin-bottom: 16px;">
               <div class="text-gray" style="font-size: 0.85rem; margin-bottom: 4px;">모듈 수</div>
-              <div id="metaModuleCount" style="color: var(--text-primary);">N/A</div>
+              <div id="metaModuleCount" style="color: #f1f5f9;">N/A</div>
             </div>
           </div>
 
           <!-- AI Output Section -->
           <div id="aiResult">
-            <!-- Known Problematic Drivers -->
-            <div class="driver-card" id="driverCard" style="display:none;">
-              <div class="driver-header">
-                <span>⚠️ Known Problematic Drivers Detected</span>
-              </div>
-              <div id="driverList"></div>
+            <!-- 핵심 원인별 영향도 분석 (Impact Analysis by Root Cause) -->
+            <div id="aiRootCauses" style="margin-top: 32px; margin-bottom: 32px; display: none;">
+              <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">핵심 원인별 영향도 분석</h3>
+              <div id="rootCauseList" style="display: flex; flex-direction: column; gap: 24px;"></div>
             </div>
 
-            <div class="ai-summary-text" id="aiSummary"></div>
+            <!-- 추가 분석 권고 (Additional Analysis Recommendations) -->
+            <div id="aiRecommendationsExt" style="margin-bottom: 32px; display: none;">
+              <h3 style="color: #06b6d4; font-size: 1.1rem; margin-bottom: 16px;">추가 분석 권고</h3>
+              <div id="valAiRecs" style="display: flex; flex-direction: column; gap: 8px; color: #f1f5f9; line-height: 1.6;"></div>
+            </div>
 
-            <div class="ai-cols">
+            <div class="ai-summary-text" id="aiSummary" style="display: none;"></div>
+
+            <div class="ai-cols" id="aiLegacyCols" style="display: none;">
               <div>
                 <div class="ai-col-title">Probable Cause</div>
                 <div class="ai-col-content" id="aiCause"></div>
@@ -1019,26 +1044,25 @@ async function runAIDiagnosis() {
     const modules = (currentAnalysis.loaded_modules || []).slice(0, 10);
     const diagnosis = currentAnalysis.diagnosis || {};
 
-    const systemPrompt = `You are a senior Windows kernel crash dump analysis expert with 15+ years of experience.
-Analyze the provided crash dump data and return ONLY a valid JSON object (no markdown, no code blocks).
+    const systemPrompt = `You are a senior Windows kernel crash dump analysis expert.
+Analyze the provided crash dump data and return ONLY a valid JSON object.
 Rules:
-1. lay_summary: 3 sentences max, no jargon, for non-technical users
-2. technical_analysis: specific, reference driver names and addresses
-3. confidence: integer 0-100
-4. prioritized_fixes: array of 3-5 strings, most impactful first
-5. additional_checks: array of 2-3 strings
-6. severity: one of critical|high|medium|low
-7. Respond in Korean (한국어)`;
+1. "lay_summary": 1-2 sentences summarizing the crash (Korean).
+2. "failure_bucket": The bugcheck and module (e.g., "BREAKPOINT_80000003_twinapi.appcore.dll!Event::WaitWithFreeUnusedLibraries")
+3. "faulting_thread": Thread ID (e.g., "FAULTING_THREAD: 00004f74")
+4. "stack_summary": High-level trace (e.g., "NtWaitForMultipleObjects -> KERNELBASE!...")
+5. "third_party_modules": List of suspicious third-party DLLs/sys (e.g., "f_nxa.dll, f_nxacc.dll 등 Fasoo DRM 다수 로드")
+6. "root_causes": Array of objects, each with "cause" (string) and "details" (string explaining driver/module signs). Max 2 items.
+7. "recommendations": Array of strings (e.g., "추가 로그 : Application, System", "추가 비교 : ...")
+Respond in Korean (한국어)`;
 
     const userPrompt = `Analyze this Windows crash:
 - Bug Check: ${crash.bugcheck_code} (${crash.bugcheck_name})
 - Caused By: ${crash.caused_by_driver || 'Unknown'}
-- Severity: ${crash.severity}
 - OS: ${sysInfo.os_version || 'Unknown'}
 - Modules: ${modules.map(m => m.name).join(', ')}
-- Known Causes: ${(diagnosis.known_causes || []).join('; ')}
 
-Return JSON with keys: lay_summary, technical_analysis, root_cause, confidence, confidence_reason, prioritized_fixes, additional_checks, severity, estimated_impact`;
+Return JSON with keys: lay_summary, failure_bucket, faulting_thread, stack_summary, third_party_modules, root_causes, recommendations`;
 
     const response = await puter.ai.chat(userPrompt, { model: 'gpt-4o-mini', systemPrompt });
     clearInterval(interval);
@@ -1052,17 +1076,6 @@ Return JSON with keys: lay_summary, technical_analysis, root_cause, confidence, 
     } else {
       throw new Error('Could not parse AI response as JSON');
     }
-
-    // Ensure required fields
-    ai.lay_summary = ai.lay_summary || '분석 결과를 확인해 주세요.';
-    ai.technical_analysis = ai.technical_analysis || ai.root_cause || '기술 분석 정보 없음';
-    ai.root_cause = ai.root_cause || '알 수 없음';
-    ai.confidence = ai.confidence || 70;
-    ai.confidence_reason = ai.confidence_reason || '규칙 기반 분석 결과 기준';
-    ai.prioritized_fixes = ai.prioritized_fixes || diagnosis.suggested_fixes || [];
-    ai.additional_checks = ai.additional_checks || [];
-    ai.severity = ai.severity || crash.severity || 'high';
-    ai.estimated_impact = ai.estimated_impact || '시스템 불안정 및 데이터 손실 가능성';
 
     currentAIDiagnosis = ai;
     renderAIResult(ai);
@@ -1078,31 +1091,39 @@ function renderAIResult(ai) {
   const resultDiv = document.getElementById('finalAnalysisContent');
   resultDiv.style.display = 'block';
 
-  // Handle problematic drivers (simulate using AI output or current state)
-  // We'll show a mocked up problematic driver if it exists in analysisResult
   const crash = window.currentAnalysis?.crash_summary || {};
-  if (crash.caused_by_driver && crash.caused_by_driver !== 'Unknown') {
-    document.getElementById('driverCard').style.display = 'block';
-    document.getElementById('driverList').innerHTML = `
-      <div class="driver-item">
-        <div class="driver-name">${crash.caused_by_driver} <span class="driver-badge">security</span></div>
-        <div class="driver-desc">Identified as the potential root cause of the crash. Known to cause stability issues or conflict with kernel processes.</div>
-        <div class="driver-tip">Tip: Update the software to the latest version or temporarily remove it to test system stability.</div>
+  
+  // 주요 오류 식별
+  document.getElementById('aiMajorErrors').style.display = 'block';
+  document.getElementById('valAiBucket').innerText = ai.failure_bucket || `${crash.bugcheck_name || 'UNKNOWN_BUGCHECK'}_${crash.caused_by_driver || 'Unknown'}`;
+  document.getElementById('valAiThread').innerText = ai.faulting_thread || 'N/A';
+  document.getElementById('valAiProcess').innerText = window.currentAnalysis?.target_process || 'N/A';
+  document.getElementById('valAiStack').innerText = ai.stack_summary || 'N/A';
+  document.getElementById('valAiThirdParty').innerText = ai.third_party_modules || 'N/A';
+  
+  // 핵심 원인별 영향도 분석
+  const causes = ai.root_causes || [];
+  if (causes.length > 0) {
+    document.getElementById('aiRootCauses').style.display = 'block';
+    document.getElementById('rootCauseList').innerHTML = causes.map(c => `
+      <div style="background: #0f172a; padding: 16px; border-radius: 8px; border: 1px solid #1e293b;">
+        <div style="margin-bottom: 12px;">
+          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">원인 항목</div>
+          <div style="color: #f1f5f9; font-weight: 600;">${c.cause || 'Unknown'}</div>
+        </div>
+        <div>
+          <div style="color: #64748b; font-size: 0.85rem; margin-bottom: 4px;">주요 관련 드라이버/징후</div>
+          <div style="color: #f1f5f9; line-height: 1.5;">${c.details || 'N/A'}</div>
+        </div>
       </div>
-    `;
+    `).join('');
   }
 
-  // Set AI summary
-  document.getElementById('aiSummary').innerHTML = `"...The system crashed with a ${crash.bugcheck_name || 'UNKNOWN_BUGCHECK'} (${crash.bugcheck_code ? '0x'+crash.bugcheck_code.toString(16) : 'N/A'}) due to a fault in the ${crash.caused_by_driver || 'system'} driver stack."`;
-
-  // Parse AI output for Probable Cause and Recommendations
-  document.getElementById('aiCause').innerHTML = `<p>${ai.technical_analysis || ai.root_cause || "No clear cause identified."}</p>`;
-  
-  const fixes = ai.prioritized_fixes || [];
-  if (fixes.length > 0) {
-    document.getElementById('aiRecommendations').innerHTML = `<ul>${fixes.map(f => `<li>${f}</li>`).join('')}</ul>`;
-  } else {
-    document.getElementById('aiRecommendations').innerHTML = '<p>No specific recommendations.</p>';
+  // 추가 분석 권고
+  const recs = ai.recommendations || [];
+  if (recs.length > 0) {
+    document.getElementById('aiRecommendationsExt').style.display = 'block';
+    document.getElementById('valAiRecs').innerHTML = recs.map(r => `<div>${r}</div>`).join('');
   }
 }
 
