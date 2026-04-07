@@ -893,7 +893,11 @@ async function chunkedUpload(file) {
             body: chunk, // Pass Blob directly to avoid loading into memory and causing OOM
           }
         );
-        if (chunkResp.ok) { lastErr = null; break; }
+        if (chunkResp.ok) { 
+          await chunkResp.json().catch(() => {}); // Consume the body to release the connection!
+          lastErr = null; 
+          break; 
+        }
         const errBody = await chunkResp.json().catch(() => ({}));
         lastErr = new Error(
           `Chunk ${i} failed (HTTP ${chunkResp.status}): ${errBody.detail || chunkResp.statusText}`
@@ -933,6 +937,7 @@ async function chunkedUpload(file) {
     const e = await completeResp.json().catch(() => ({}));
     throw new Error('Failed to complete upload: ' + (e.detail || completeResp.status));
   }
+  await completeResp.json().catch(() => {}); // Consume body to release connection
 
   // Analyze
   setStep('parse', 'active');

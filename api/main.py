@@ -511,10 +511,15 @@ async def upload_chunk(upload_id: str, part_number: int, request: Request):
 
     # Save chunk to disk — /tmp is writable on Vercel
     session_dir = Path(session["session_dir"])
-    try:
+    import asyncio
+    
+    def save_chunk():
         session_dir.mkdir(parents=True, exist_ok=True)
         chunk_path = session_dir / f"part_{part_number:05d}"
         chunk_path.write_bytes(chunk_data)
+
+    try:
+        await asyncio.to_thread(save_chunk)
     except Exception as exc:
         logger.error(f"Failed to write chunk {part_number}: {exc}")
         raise HTTPException(status_code=500, detail=f"Failed to save chunk {part_number}: {exc}")
@@ -526,7 +531,7 @@ async def upload_chunk(upload_id: str, part_number: int, request: Request):
     # Persist updated session to disk
     UPLOAD_SESSIONS[upload_id] = session
     try:
-        _save_session(session)
+        await asyncio.to_thread(_save_session, session)
     except Exception as exc:
         logger.warning(f"Could not persist session after chunk {part_number}: {exc}")
 
