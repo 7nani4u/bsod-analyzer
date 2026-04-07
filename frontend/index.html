@@ -881,7 +881,6 @@ async function chunkedUpload(file) {
     const start = (i - 1) * VERCEL_CHUNK_SIZE;
     const end = Math.min(start + VERCEL_CHUNK_SIZE, file.size);
     const chunk = file.slice(start, end);
-    const chunkBuf = await chunk.arrayBuffer();
 
     let lastErr = null;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -891,7 +890,7 @@ async function chunkedUpload(file) {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/octet-stream' },
-            body: chunkBuf,
+            body: chunk, // Pass Blob directly to avoid loading into memory and causing OOM
           }
         );
         if (chunkResp.ok) { lastErr = null; break; }

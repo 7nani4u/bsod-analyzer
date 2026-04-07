@@ -603,30 +603,37 @@ async def upload_complete(req: CompleteUploadRequest):
 
     # Assemble chunks inside the session directory
     output_path = session_dir / "assembled.dmp"
+    import asyncio
+    
+    def assemble_and_hash():
+        try:
+            with open(output_path, "wb") as out:
+                for i in range(1, session["total_chunks"] + 1):
+                    chunk_path = session_dir / f"part_{i:05d}"
+                    with open(chunk_path, "rb") as cp:
+                        out.write(cp.read())
+        except Exception as exc:
+            output_path.unlink(missing_ok=True)
+            raise RuntimeError(f"Failed to assemble chunks: {exc}")
+
+        # Verify size
+        actual_size = output_path.stat().st_size
+        if actual_size != session["file_size"]:
+            output_path.unlink(missing_ok=True)
+            raise RuntimeError(f"Size mismatch: expected {session['file_size']}, got {actual_size}")
+
+        # Compute SHA-256 (stream to avoid loading 2 GB into memory)
+        h = hashlib.sha256()
+        with open(output_path, "rb") as f:
+            for block in iter(lambda: f.read(1024 * 1024 * 4), b""):
+                h.update(block)
+        return actual_size, h.hexdigest()
+
     try:
-        with open(output_path, "wb") as out:
-            for i in range(1, session["total_chunks"] + 1):
-                chunk_path = session_dir / f"part_{i:05d}"
-                out.write(chunk_path.read_bytes())
-    except Exception as exc:
-        output_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=500, detail=f"Failed to assemble chunks: {exc}")
+        actual_size, sha256 = await asyncio.to_thread(assemble_and_hash)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500 if "assemble" in str(exc) else 400, detail=str(exc))
 
-    # Verify size
-    actual_size = output_path.stat().st_size
-    if actual_size != session["file_size"]:
-        output_path.unlink(missing_ok=True)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Size mismatch: expected {session['file_size']}, got {actual_size}"
-        )
-
-    # Compute SHA-256 (stream to avoid loading 2 GB into memory)
-    h = hashlib.sha256()
-    with open(output_path, "rb") as f:
-        for block in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(block)
-    sha256 = h.hexdigest()
 
     session["assembled_path"] = str(output_path)
     session["sha256_actual"] = sha256
