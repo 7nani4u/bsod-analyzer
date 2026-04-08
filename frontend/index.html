@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>BSOD Analyzer v2</title>
+  <title>Universal Log Analyzer</title>
   <!-- Puter.js: free unlimited AI (no API key required) -->
   <script src="https://js.puter.com/v2/"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -129,10 +129,11 @@
     .upload-zone h3 { font-size: 1.2rem; font-weight: 600; margin-bottom: 8px; }
     .upload-zone p { color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px; }
     .upload-meta {
-      font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted);
+      font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-primary);
       display: flex; gap: 24px; justify-content: center;
+      background: rgba(255, 255, 255, 0.05); padding: 12px 20px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1);
     }
-    .upload-meta span { display: flex; align-items: center; gap: 6px; }
+    .upload-meta span { display: flex; align-items: center; gap: 6px; font-weight: 500; }
     #fileInput { display: none; }
     .btn {
       display: inline-flex; align-items: center; gap: 8px;
@@ -483,14 +484,14 @@
 
 <!-- Navigation -->
 <nav>
-  <a class="nav-logo" href="#"><span>BSOD</span> Analyzer</a>
+  <a class="nav-logo" href="#"><span>Log</span> Analyzer</a>
   <div class="nav-links">
     <button class="nav-link active" onclick="showPage('analyzer')">⚡ Analyzer</button>
-    <button class="nav-link" onclick="showPage('windbg')">💻 !analyze -v</button>
-    <button class="nav-link" onclick="showPage('bugchecks')">📋 Bug Checks</button>
+    <button class="nav-link" onclick="showPage('windbg')">💻 Raw Logs</button>
+    <button class="nav-link" onclick="showPage('bugchecks')">📋 DB Reference</button>
     <a class="nav-link" href="/api/docs" target="_blank">📖 API Docs</a>
   </div>
-  <div class="nav-badge">v2.0 LIVE</div>
+  <div class="nav-badge" style="color:var(--accent-green); border-color:rgba(0,255,136,0.2); background:rgba(0,255,136,0.1);">Server Online</div>
 </nav>
 
 <!-- ═══════════════════════════════════════════════════════ ANALYZER PAGE -->
