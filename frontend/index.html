@@ -611,12 +611,13 @@
           </div>
 
           <!-- AI Output Section -->
-          <div class="dash-card" id="aiResultCard" style="display: none;">
-            <h3 style="border-bottom: 1px solid #1e293b; padding-bottom: 16px; margin-bottom: 24px; font-size: 1.2rem;">🤖 AI Comprehensive Analysis Report</h3>
-            
-            <!-- AI Markdown Report Content -->
-            <div class="ai-markdown" id="aiReportContent"></div>
-            
+          <div id="aiResultCard" style="display:none; margin-top:8px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:18px;padding:14px 18px;background:linear-gradient(90deg,rgba(59,130,246,0.12),transparent);border-left:3px solid #3b82f6;border-radius:6px;">
+              <span style="font-size:1.25rem;">🤖</span>
+              <h3 style="margin:0;font-size:1.1rem;color:#e2e8f0;font-weight:600;">AI Comprehensive Analysis Report</h3>
+            </div>
+            <!-- Section cards rendered here by JS -->
+            <div id="aiReportContent"></div>
             <div id="aiLegacyCols" style="display:none;"></div>
             <div id="aiSummary" style="display:none;"></div>
             <div id="aiProblematicDriversContainer" style="display:none;"></div>
@@ -1235,17 +1236,108 @@ function escapeHtml(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
+// ───────────────────────────────────────────────────────────
+// Section 색상 / 아이콘 매핑
+// ───────────────────────────────────────────────────────────
+const SECTION_META = [
+  { emoji: '🔍', color: '#3b82f6', bg: 'rgba(59,130,246,0.08)'  },
+  { emoji: '⚠',  color: '#f59e0b', bg: 'rgba(245,158,11,0.08)'  },
+  { emoji: '🧠', color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)'  },
+  { emoji: '🛠',  color: '#10b981', bg: 'rgba(16,185,129,0.08)'  },
+  { emoji: '🔬', color: '#06b6d4', bg: 'rgba(6,182,212,0.08)'   },
+  { emoji: '📌', color: '#64748b', bg: 'rgba(100,116,139,0.08)' },
+];
+
+function getSectionMeta(title) {
+  for (const m of SECTION_META) {
+    if (title.startsWith(m.emoji)) return m;
+  }
+  return { color: '#3b82f6', bg: 'rgba(59,130,246,0.08)' };
+}
+
+// ───────────────────────────────────────────────────────────
+// AI 마크다운 → 섹션 배열로 파싱
+// ───────────────────────────────────────────────────────────
+function parseSections(md) {
+  const EMOJIS = ['🔍', '⚠️', '⚠', '🧠', '🛠️', '🛠', '🔬', '📌', '📧'];
+  const lines  = md.split('\n');
+  const sections = [];
+  let preamble = '';
+  let current  = null;
+
+  const isHeader = line => {
+    const s = line.replace(/^#{1,3}\s*/, '').trim();
+    return EMOJIS.some(e => s.startsWith(e)) && s.length > 3 ? s : null;
+  };
+
+  for (const line of lines) {
+    const headerTitle = isHeader(line);
+    if (headerTitle) {
+      if (current) sections.push(current);
+      current = { title: headerTitle, content: '' };
+    } else if (current) {
+      current.content += line + '\n';
+    } else {
+      preamble += line + '\n';
+    }
+  }
+  if (current) sections.push(current);
+  return { preamble: preamble.trim(), sections };
+}
+
+// ───────────────────────────────────────────────────────────
+// 섹션 카드 HTML 생성
+// ───────────────────────────────────────────────────────────
+function buildSectionCard(section) {
+  const meta = getSectionMeta(section.title);
+  return `
+    <div class="dash-card" style="margin-bottom:14px;border-top:2px solid ${meta.color};padding-top:18px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #1e293b;">
+        <span style="font-size:1.1rem;">${[...section.title][0]}</span>
+        <h3 style="margin:0;font-size:1rem;font-weight:600;color:#e2e8f0;">
+          ${escapeHtml(section.title.replace(/^.\s*/, ''))}
+        </h3>
+      </div>
+      <div>${markdownToHtml(section.content)}</div>
+    </div>`;
+}
+
+// ───────────────────────────────────────────────────────────
+// renderAIResult
+// ───────────────────────────────────────────────────────────
 function renderAIResult(ai) {
   document.getElementById('aiLoading').style.display = 'none';
-  const resultDiv = document.getElementById('finalAnalysisContent');
-  resultDiv.style.display = 'block';
-
+  document.getElementById('finalAnalysisContent').style.display = 'block';
   document.getElementById('aiResultCard').style.display = 'block';
-  if (ai.markdown_report) {
-    document.getElementById('aiReportContent').innerHTML = markdownToHtml(ai.markdown_report);
-  } else {
-    document.getElementById('aiReportContent').innerHTML = '<p style="color:var(--accent-red);">AI Report was not generated properly.</p>';
+
+  const container = document.getElementById('aiReportContent');
+
+  if (!ai.markdown_report) {
+    container.innerHTML = `<div class="dash-card" style="color:var(--accent-red);padding:20px;">AI Report was not generated properly.</div>`;
+    return;
   }
+
+  const { preamble, sections } = parseSections(ai.markdown_report);
+
+  // 섹션이 감지되지 않은 경우 → 단일 카드로 폴백
+  if (sections.length === 0) {
+    container.innerHTML = `<div class="dash-card">${markdownToHtml(ai.markdown_report)}</div>`;
+    return;
+  }
+
+  let html = '';
+
+  // 전문(preamble)이 있으면 안내 문구 카드로 표시
+  if (preamble) {
+    html += `<div class="dash-card" style="margin-bottom:14px;padding:14px 18px;background:rgba(30,41,59,0.5);border:1px solid #1e293b;">
+      <p style="margin:0;color:#94a3b8;font-size:0.92rem;line-height:1.7;">${escapeHtml(preamble)}</p>
+    </div>`;
+  }
+
+  // 각 섹션 → 카드
+  sections.forEach(sec => { html += buildSectionCard(sec); });
+
+  container.innerHTML = html;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
