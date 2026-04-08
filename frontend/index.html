@@ -522,11 +522,11 @@
           ⬆ Browse File
         </button>
         <div class="upload-meta" style="margin-top:16px">
-          <span>📎 .dmp, .mdmp, .dump</span>
+          <span>📎 .dmp, .mdmp, .dump, .txt, .csv</span>
           <span>📦 Max 2GB (chunked)</span>
           <span>🔒 Processed locally</span>
         </div>
-        <input type="file" id="fileInput" accept=".dmp,.mdmp,.dump" onchange="handleFileSelect(event)" />
+        <input type="file" id="fileInput" accept=".dmp,.mdmp,.dump,.txt,.csv" onchange="handleFileSelect(event)" />
       </div>
 
       <!-- Progress -->
@@ -778,6 +778,39 @@ function showPage(name) {
   if (name === 'bugchecks' && allBugchecks.length === 0) loadBugchecks();
 }
 
+window.addEventListener('DOMContentLoaded', async () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const uploadId = urlParams.get('upload_id');
+  if (uploadId) {
+    showPage('analyzer');
+    showProgress();
+    setStep('parse', 'active');
+    setProgress(80, 'Analyzing uploaded file...');
+    try {
+      const resp = await fetch(`${API_BASE}/api/analyze/by-upload-id/${uploadId}`, { method: 'POST' });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        throw new Error(e.detail || 'Analysis failed');
+      }
+      const data = await resp.json();
+      currentAnalysis = data;
+      renderResults(data);
+      setStep('report', 'done');
+      setProgress(100, 'Analysis complete!');
+      setTimeout(() => {
+        document.getElementById('progressContainer').classList.remove('visible');
+        document.getElementById('resultsSection').classList.add('visible');
+      }, 800);
+      
+      // Remove upload_id from URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (err) {
+      showToast('Analysis failed: ' + (err.message || err), 'error');
+      document.getElementById('progressContainer').classList.remove('visible');
+    }
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════
 // Toast
 // ═══════════════════════════════════════════════════════════════════════
@@ -806,9 +839,9 @@ function handleFileSelect(e) {
 }
 
 async function processFile(file) {
-  const allowed = ['.dmp', '.mdmp', '.dump'];
+  const allowed = ['.dmp', '.mdmp', '.dump', '.txt', '.csv'];
   const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) { showToast('Invalid file type. Use .dmp, .mdmp, or .dump', 'error'); return; }
+  if (!allowed.includes(ext)) { showToast('Invalid file type. Use .dmp, .mdmp, .dump, .txt, or .csv', 'error'); return; }
   if (file.size > 2 * 1024 * 1024 * 1024) { showToast('File exceeds 2GB limit', 'error'); return; }
 
   showProgress();

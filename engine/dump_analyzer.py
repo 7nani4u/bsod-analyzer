@@ -1121,6 +1121,9 @@ class DumpAnalyzer:
         so it can run without cdb.exe on Vercel.
         Matches the requested script format.
         """
+        if result.analysis_mode == "text":
+            return
+            
         lines = []
         is_user_mode = "MDMP" in result.dump_type or "User-mode" in result.dump_type
         
@@ -1426,6 +1429,37 @@ class DumpAnalyzer:
             MdmpParser(data).parse(result)
 
         else:
+            # Check if it's a text/CSV log file (e.g., WinDbg output)
+            try:
+                text_content = data.decode("utf-8")
+                # It decoded successfully as UTF-8, treat as text log
+                logger.info("Detected text log (UTF-8)")
+                result.dump_type = "Text/CSV Log"
+                result.analysis_mode = "text"
+                result.windbg_output = text_content
+                
+                # Attempt to extract bugcheck code from text if possible
+                import re
+                bugcheck_match = re.search(r"BugCheck\s+([0-9a-fA-F]+)", text_content, re.IGNORECASE)
+                if bugcheck_match:
+                    try:
+                        result.bugcheck_code = int(bugcheck_match.group(1), 16)
+                    except ValueError:
+                        pass
+                return
+            except UnicodeDecodeError:
+                pass
+                
+            try:
+                text_content = data.decode("utf-16-le")
+                logger.info("Detected text log (UTF-16)")
+                result.dump_type = "Text/CSV Log"
+                result.analysis_mode = "text"
+                result.windbg_output = text_content
+                return
+            except UnicodeDecodeError:
+                pass
+
             # Try to detect by scanning for known signatures at offset 0
             result.errors.append(
                 f"Unknown dump format. "

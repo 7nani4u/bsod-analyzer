@@ -263,7 +263,7 @@ if frontend_dir.exists():
 # ---------------------------------------------------------------------------
 
 def validate_dump_file(file: UploadFile) -> None:
-    allowed_extensions = {".dmp", ".mdmp", ".dump"}
+    allowed_extensions = {".dmp", ".mdmp", ".dump", ".txt", ".csv"}
     filename = file.filename or ""
     ext = Path(filename).suffix.lower()
     if ext not in allowed_extensions:
@@ -658,6 +658,51 @@ async def upload_complete(req: CompleteUploadRequest):
         ready_for_analysis=True,
     )
 
+@app.post(
+    "/api/upload/direct",
+    tags=["upload"],
+    summary="Direct upload for small files (returns upload_id)",
+    description="Upload a small file directly and get an upload_id for analysis. Useful for scripts.",
+)
+async def upload_direct(file: UploadFile = File(...)):
+    validate_dump_file(file)
+    content = await file.read()
+    file_size = len(content)
+
+    if file_size > 4 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File too large for direct upload. Max 4MB.")
+
+    upload_id = uuid.uuid4().hex
+    session_dir = _get_session_dir(upload_id)
+    
+    output_path = session_dir / "assembled.dmp"
+    output_path.write_bytes(content)
+    
+    sha256 = hashlib.sha256(content).hexdigest()
+    
+    session = {
+        "upload_id": upload_id,
+        "filename": file.filename or "unknown.txt",
+        "file_size": file_size,
+        "chunk_size": file_size,
+        "total_chunks": 1,
+        "completed_parts": [1],
+        "expires_at": time.time() + 3600,
+        "session_dir": str(session_dir),
+        "assembled_path": str(output_path),
+        "sha256_actual": sha256,
+    }
+    
+    UPLOAD_SESSIONS[upload_id] = session
+    _save_session(session)
+    
+    return {
+        "upload_id": upload_id,
+        "filename": session["filename"],
+        "file_size": file_size,
+        "ready_for_analysis": True
+    }
+
 @app.delete(
     "/api/upload/abort/{upload_id}",
     tags=["upload"],
@@ -689,6 +734,7 @@ For files larger than 4 MB, use the chunked upload endpoints (`/api/upload/*`) i
 - `.dmp` — Windows kernel minidump (64-bit or 32-bit)
 - `.mdmp` — User-mode minidump (application crash)
 - `.dump` — Generic dump format
+- `.txt`, `.csv` — Text logs (e.g. WinDbg output)
 
 **Returns:** Structured JSON with Bug Check code, system info, loaded modules, and suggested fixes.
     """,
@@ -699,7 +745,7 @@ For files larger than 4 MB, use the chunked upload endpoints (`/api/upload/*`) i
         500: {"description": "Analysis engine error"},
     },
 )
-async def analyze_dump(file: UploadFile = File(..., description="Windows dump file (.dmp, .mdmp, .dump)")):
+async def analyze_dump(file: UploadFile = File(..., description="Windows dump file (.dmp, .mdmp, .dump, .txt, .csv)")):
     validate_dump_file(file)
     content = await file.read()
     file_size = len(content)
