@@ -1197,7 +1197,13 @@ ${(window.currentAnalysis?.windbg_output || '').substring(0, 4000)}
 [Loaded Modules / Components]
 ${modules.map(m => m.name).join(', ')}`;
 
-    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3-flash-preview', systemPrompt });
+    const fullPrompt = systemPrompt + "\n\n---\n\n" + userPrompt;
+    
+    // 타임아웃 처리를 추가하여 무한 로딩 방지 (60초)
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI API 응답 시간 초과 (60초)')), 60000));
+    const aiPromise = puter.ai.chat(fullPrompt, { model: 'gpt-5-nano' });
+    
+    const response = await Promise.race([aiPromise, timeoutPromise]);
     clearInterval(interval);
 
     const text = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
@@ -1341,7 +1347,13 @@ Rules:
 5. ■ 권장 사항 및 다음 단계
 6. 맺음말`;
 
-    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3-flash-preview', systemPrompt });
+    const fullPrompt = systemPrompt + "\n\n---\n\n" + userPrompt;
+    
+    // 이메일 생성 시에도 무한 로딩 방지
+    const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI API 응답 시간 초과 (60초)')), 60000));
+    const aiPromise = puter.ai.chat(fullPrompt, { model: 'gpt-5-nano' });
+    
+    const response = await Promise.race([aiPromise, timeoutPromise]);
     const emailText = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
 
     document.getElementById('emailPreview').textContent = emailText;
