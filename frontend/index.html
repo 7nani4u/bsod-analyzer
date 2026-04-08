@@ -1197,7 +1197,7 @@ ${(window.currentAnalysis?.windbg_output || '').substring(0, 4000)}
 [Loaded Modules / Components]
 ${modules.map(m => m.name).join(', ')}`;
 
-    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3.1-pro-preview', systemPrompt });
+    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3-flash-preview', systemPrompt });
     clearInterval(interval);
 
     const text = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
@@ -1341,7 +1341,7 @@ Rules:
 5. ■ 권장 사항 및 다음 단계
 6. 맺음말`;
 
-    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3.1-pro-preview', systemPrompt });
+    const response = await puter.ai.chat(userPrompt, { model: 'gemini-3-flash-preview', systemPrompt });
     const emailText = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
 
     document.getElementById('emailPreview').textContent = emailText;
