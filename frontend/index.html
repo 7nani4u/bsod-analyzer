@@ -807,6 +807,13 @@ window.addEventListener('DOMContentLoaded', async () => {
       showToast('Analysis failed: ' + (err.message || err), 'error');
       document.getElementById('progressContainer').classList.remove('visible');
     }
+  } else {
+    // URL에 upload_id가 없을 경우, 사용자가 바로 파일을 선택할 수 있도록 'Browse File' 버튼에 자동으로 포커스를 줍니다.
+    // 브라우저 보안 정책상 파일 선택 창을 강제로 띄울 수는 없으나, 포커스가 되어 있어 엔터(Enter)나 스페이스바만 누르면 바로 열립니다.
+    setTimeout(() => {
+      const browseBtn = document.querySelector('.upload-zone .btn-primary');
+      if (browseBtn) browseBtn.focus();
+    }, 300);
   }
 });
 
@@ -819,6 +826,40 @@ function showToast(msg, type = 'info') {
   t.className = `toast show ${type}`;
   setTimeout(() => t.classList.remove('show'), 3500);
 }
+
+// ═══════════════════════════════════════════════════════════════════════
+// Puter.js Auto-Clicker (Best Effort)
+// ═══════════════════════════════════════════════════════════════════════
+// 이 코드는 Puter.js가 띄우는 "Continue" 버튼을 주기적으로 찾아 자동으로 클릭하도록 시도합니다.
+// 만약 Puter.js가 이 버튼을 동일한 출처(Shadow DOM 등)에 렌더링했다면 자동 클릭이 성공하지만,
+// 외부 도메인(js.puter.com)의 iframe 내부에 렌더링했다면 브라우저의 CORS 보안 정책으로 인해 실패합니다.
+setInterval(() => {
+  try {
+    // 1. 일반 DOM 및 Shadow DOM 내에서 'Continue' 버튼 탐색
+    const findAndClickContinue = (root) => {
+      const buttons = root.querySelectorAll('button');
+      for (const btn of buttons) {
+        if (btn.textContent.trim().toLowerCase() === 'continue') {
+          btn.click();
+          return true;
+        }
+      }
+      return false;
+    };
+
+    // 메인 문서에서 찾기
+    if (findAndClickContinue(document)) return;
+
+    // 모든 요소의 Shadow Root 내부까지 뒤지기
+    document.querySelectorAll('*').forEach(el => {
+      if (el.shadowRoot) {
+        findAndClickContinue(el.shadowRoot);
+      }
+    });
+  } catch (err) {
+    // iframe cross-origin 에러 등은 무시
+  }
+}, 500);
 
 // ═══════════════════════════════════════════════════════════════════════
 // File upload — chunked for large files, direct for small
