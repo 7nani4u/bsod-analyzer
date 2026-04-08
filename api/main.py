@@ -263,7 +263,7 @@ if frontend_dir.exists():
 # ---------------------------------------------------------------------------
 
 def validate_dump_file(file: UploadFile) -> None:
-    allowed_extensions = {".dmp", ".mdmp", ".dump", ".txt", ".csv"}
+    allowed_extensions = {".txt", ".csv"}
     filename = file.filename or ""
     ext = Path(filename).suffix.lower()
     if ext not in allowed_extensions:
@@ -723,18 +723,15 @@ async def upload_abort(upload_id: str):
 @app.post(
     "/api/analyze",
     tags=["analysis"],
-    summary="Analyze a dump file (direct upload, max 4MB on Vercel)",
+    summary="Analyze a log file (direct upload, max 4MB on Vercel)",
     description="""
-Upload and analyze a Windows crash dump file directly.
+Upload and analyze a text or CSV log file directly.
 
 **⚠️ Vercel Limitation:** Vercel serverless enforces a **4.5 MB request body limit**.
 For files larger than 4 MB, use the chunked upload endpoints (`/api/upload/*`) instead.
 
 **Supported formats:**
-- `.dmp` — Windows kernel minidump (64-bit or 32-bit)
-- `.mdmp` — User-mode minidump (application crash)
-- `.dump` — Generic dump format
-- `.txt`, `.csv` — Text logs (e.g. WinDbg output)
+- `.txt`, `.csv` — Text logs (e.g. WinDbg output, system logs)
 
 **Returns:** Structured JSON with Bug Check code, system info, loaded modules, and suggested fixes.
     """,
@@ -745,7 +742,7 @@ For files larger than 4 MB, use the chunked upload endpoints (`/api/upload/*`) i
         500: {"description": "Analysis engine error"},
     },
 )
-async def analyze_dump(file: UploadFile = File(..., description="Windows dump file (.dmp, .mdmp, .dump, .txt, .csv)")):
+async def analyze_dump(file: UploadFile = File(..., description="Log file (.txt, .csv)")):
     validate_dump_file(file)
     content = await file.read()
     file_size = len(content)

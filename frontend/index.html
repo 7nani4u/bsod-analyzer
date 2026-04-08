@@ -499,34 +499,32 @@
 
     <!-- Hero -->
     <div class="hero">
-      <div class="hero-tag">Windows Crash Analysis Engine</div>
-      <h1><span class="glow">BSOD</span> Analyzer</h1>
-      <p>Upload a Windows crash dump file and get instant AI-powered diagnostic results — no WinDbg required.</p>
+      <div class="hero-tag">Universal Log Analysis Engine</div>
+      <h1><span class="glow">Log</span> Analyzer</h1>
+      <p>Upload your text or CSV log files and get instant AI-powered diagnostic results.</p>
       <div class="feature-pills">
-        <span class="pill">🔍 Bug Check Code</span>
+        <span class="pill">🔍 Any Text/CSV Log</span>
         <span class="pill">🤖 AI Diagnosis</span>
         <span class="pill">📧 Email Draft</span>
-        <span class="pill">📄 PDF Report</span>
-        <span class="pill">📦 Up to 2GB</span>
-        <span class="pill">⚡ Chunked Upload</span>
+        <span class="pill"> Up to 2GB</span>
       </div>
     </div>
 
     <!-- Upload Zone -->
     <div class="upload-section">
       <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-        <div class="upload-icon">📁</div>
-        <h3>Drop your .dmp file here</h3>
-        <p>Supports Kernel Minidump, User-mode Minidump, and Complete Memory Dumps</p>
+        <div class="upload-icon">�</div>
+        <h3>Drop your log file here</h3>
+        <p>Supports Text Logs (.txt) and CSV files</p>
         <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
           ⬆ Browse File
         </button>
         <div class="upload-meta" style="margin-top:16px">
-          <span>📎 .dmp, .mdmp, .dump, .txt, .csv</span>
+          <span>📎 .txt, .csv</span>
           <span>📦 Max 2GB (chunked)</span>
           <span>🔒 Processed locally</span>
         </div>
-        <input type="file" id="fileInput" accept=".dmp,.mdmp,.dump,.txt,.csv" onchange="handleFileSelect(event)" />
+        <input type="file" id="fileInput" accept=".txt,.csv" onchange="handleFileSelect(event)" />
       </div>
 
       <!-- Progress -->
@@ -839,9 +837,9 @@ function handleFileSelect(e) {
 }
 
 async function processFile(file) {
-  const allowed = ['.dmp', '.mdmp', '.dump', '.txt', '.csv'];
+  const allowed = ['.txt', '.csv'];
   const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) { showToast('Invalid file type. Use .dmp, .mdmp, .dump, .txt, or .csv', 'error'); return; }
+  if (!allowed.includes(ext)) { showToast('Invalid file type. Use .txt or .csv', 'error'); return; }
   if (file.size > 2 * 1024 * 1024 * 1024) { showToast('File exceeds 2GB limit', 'error'); return; }
 
   showProgress();
@@ -1364,38 +1362,6 @@ Rules:
 
 function copyEmail() {
   navigator.clipboard.writeText(window._emailText || '').then(() => showToast('Email copied to clipboard!', 'success'));
-}
-
-// ═══════════════════════════════════════════════════════════════════════
-// PDF Download
-// ═══════════════════════════════════════════════════════════════════════
-async function downloadPDF() {
-  if (!currentAnalysis) { showToast('No analysis loaded', 'error'); return; }
-  showToast('Generating PDF report...', 'info');
-  try {
-    const resp = await fetch(`${API_BASE}/api/pdf/generate`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        analysis_result: currentAnalysis,
-        ai_diagnosis: currentAIDiagnosis,
-        language: 'ko',
-        include_modules: true,
-        include_watermark: false,
-      }),
-    });
-    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail); }
-    const blob = await resp.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `BSOD_Report_${new Date().toISOString().slice(0,10)}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('PDF downloaded!', 'success');
-  } catch (err) {
-    showToast('PDF failed: ' + err.message, 'error');
-  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
