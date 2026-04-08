@@ -177,61 +177,28 @@ if ($WindowsFileset.Count -eq 0) {
         }
         
         if ($uploadFile -and (Test-Path $uploadFile)) {
-            Write-Host "Proceeding with upload to Vercel API..."
+            Write-Host "Proceeding with browser automation..."
             
             # Additional check: ensure the file isn't completely empty before uploading
             if ((Get-Item $uploadFile).Length -eq 0) {
                 Write-Error "Upload skipped: The generated log file is empty."
             } else {
-                # We will upload the text file to the new direct upload endpoint.
                 try {
-                    # If testing locally with "npm run dev", change to "http://localhost:8000/api/upload/direct"
-                    $apiUrl = "https://bsod-analyzer-v2.vercel.app/api/upload/direct"
+                    $frontendUrl = "https://bsod-analyzer-v2.vercel.app/"
+                    Write-Host "Opening browser: $frontendUrl"
+                    Start-Process $frontendUrl
                     
-                    # Ensure you set the same API key that is used on the server (BSOD_API_KEY environment variable)
-                    $apiKey = "default_dev_key" 
+                    Write-Host "Wait for the browser to open and load the page..."
+                    Start-Sleep -Seconds 3
                     
-                    $boundary = [System.Guid]::NewGuid().ToString()
-                    $LF = "`r`n"
-                    
-                    $fileContent = [System.IO.File]::ReadAllBytes($uploadFile)
-                    $uploadFileName = Split-Path $uploadFile -Leaf
-                    
-                    # Create multipart/form-data payload
-                    $bodyLines = (
-                        "--$boundary",
-                        "Content-Disposition: form-data; name=`"file`"; filename=`"$uploadFileName`"",
-                        "Content-Type: text/plain",
-                        "",
-                        [System.Text.Encoding]::UTF8.GetString($fileContent),
-                        "--$boundary--"
-                    ) -join $LF
-                    
-                    $headers = @{
-                        "Content-Type" = "multipart/form-data; boundary=$boundary"
-                        "X-API-Key" = $apiKey
-                    }
-                    
-                    Write-Host "Uploading $uploadFileName to $apiUrl..."
-                    $response = Invoke-RestMethod -Uri $apiUrl -Method Post -Headers $headers -Body $bodyLines
-                    
-                    if ($response.upload_id) {
-                        Write-Host "Successfully uploaded $uploadFileName to Web API. Hash: $($response.upload_id)"
-                        
-                        # Open the website with the upload_id parameter so the frontend automatically starts AI analysis!
-                        # If testing locally, change to "http://localhost:3000/?upload_id="
-                        $frontendUrl = "https://bsod-analyzer-v2.vercel.app/?upload_id=$($response.upload_id)"
-                        Start-Process $frontendUrl
-                    } else {
-                        Write-Error "API returned failure: $($response | ConvertTo-Json)"
-                        Start-Process "https://bsod-analyzer-v2.vercel.app/"
-                    }
+                    # Ensure the file path is copied to clipboard so the user can easily paste it
+                    $uploadFile | Set-Clipboard
+                    Write-Host "The file path has been copied to your clipboard:"
+                    Write-Host "-> $uploadFile"
+                    Write-Host "Please press 'Enter' or 'Space' on the website, then paste (Ctrl+V) the path."
                     
                 } catch {
-                    Write-Error "Upload failed for $uploadFileName`: $_"
-                    
-                    # Fallback: open site and folder so user can manually upload if API fails
-                    Start-Process "https://bsod-analyzer-v2.vercel.app/"
+                    Write-Error "Failed to open browser`: $_"
                     Start-Process "explorer.exe" -ArgumentList "/select,`"$uploadFile`""
                 }
             }
