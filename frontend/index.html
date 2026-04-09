@@ -78,6 +78,33 @@
       padding: 3px 10px; border-radius: 20px; border: 1px solid rgba(0,255,136,0.2);
     }
 
+    /* ── History Sidebar ── */
+    .history-sidebar {
+      position: fixed; top: 56px; left: -320px; width: 320px; bottom: 0;
+      background: var(--bg-secondary); border-right: 1px solid var(--border);
+      z-index: 90; transition: left 0.3s; padding: 20px; display: flex; flex-direction: column;
+    }
+    .history-sidebar.open { left: 0; }
+    .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .history-title { font-weight: 600; font-size: 1.1rem; color: var(--text-primary); }
+    .history-close { background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 1.2rem; }
+    .history-search {
+      width: 100%; background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: 8px; padding: 10px 14px; color: var(--text-primary);
+      font-size: 0.85rem; outline: none; margin-bottom: 16px;
+    }
+    .history-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+    .history-item {
+      background: var(--bg-card); border: 1px solid var(--border); border-radius: 8px;
+      padding: 12px; cursor: pointer; transition: all 0.2s;
+    }
+    .history-item:hover { border-color: var(--accent-blue); background: var(--bg-hover); }
+    .history-item-title { font-size: 0.9rem; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-item-date { font-size: 0.75rem; color: var(--text-secondary); }
+    .history-item-desc { font-size: 0.8rem; color: var(--text-muted); margin-top: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-item-delete { background: none; border: none; color: var(--accent-red); cursor: pointer; font-size: 0.8rem; margin-top: 8px; opacity: 0.7; }
+    .history-item-delete:hover { opacity: 1; }
+
     /* ── Layout ── */
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
 
@@ -517,10 +544,23 @@
     <button class="nav-link active" onclick="showPage('analyzer')">⚡ Analyzer</button>
     <button class="nav-link" onclick="showPage('windbg')">💻 Raw Logs</button>
     <button class="nav-link" onclick="showPage('bugchecks')">📋 DB Reference</button>
+    <button class="nav-link" onclick="toggleHistory()">🕒 History</button>
     <a class="nav-link" href="/api/docs" target="_blank">📖 API Docs</a>
   </div>
   <div class="nav-badge" style="color:var(--accent-green); border-color:rgba(0,255,136,0.2); background:rgba(0,255,136,0.1);">Server Online</div>
 </nav>
+
+<!-- History Sidebar -->
+<div class="history-sidebar" id="historySidebar">
+  <div class="history-header">
+    <div class="history-title">Analysis History</div>
+    <button class="history-close" onclick="toggleHistory()">✕</button>
+  </div>
+  <input type="text" class="history-search" id="historySearch" placeholder="Search history..." oninput="renderHistoryList()" />
+  <div class="history-list" id="historyList">
+    <!-- History items will be rendered here -->
+  </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════════════ ANALYZER PAGE -->
 <div id="page-analyzer" class="page active">
@@ -710,6 +750,18 @@ let currentAIDiagnosis = null;
 let allBugchecks = [];
 let bugcheckFilter = 'all';
 let multipleResults = [];
+let analysisHistory = [];
+
+// Load history from localStorage on startup
+try {
+  const stored = localStorage.getItem('bsod_analyzer_history');
+  if (stored) {
+    analysisHistory = JSON.parse(stored);
+  }
+} catch (e) {
+  console.error('Failed to load history:', e);
+}
+
 const API_BASE = window.location.origin;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1374,6 +1426,9 @@ ${claudeText}`;
 
     currentAIDiagnosis = { markdown_report: finalText };
     renderAIResult(currentAIDiagnosis);
+    
+    // Save to history after successful AI analysis
+    saveToHistory(dataArray, currentAIDiagnosis);
   } catch (err) {
     clearInterval(interval);
     document.getElementById('aiLoading').innerHTML = `<span style="color:var(--accent-red)">⚠ AI 진단 실패: ${err.message}</span><br><small style="color:var(--text-secondary)">Puter.js 로그인이 필요할 수 있습니다. 잠시 후 다시 시도해 주세요.</small>`;
@@ -1735,6 +1790,146 @@ function setBugcheckFilter(f, btn) {
   document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
   renderBugchecks();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// History Management
+// ═══════════════════════════════════════════════════════════════════════
+function toggleHistory() {
+  const sidebar = document.getElementById('historySidebar');
+  sidebar.classList.toggle('open');
+  if (sidebar.classList.contains('open')) {
+    renderHistoryList();
+  }
+}
+
+function saveToHistory(dataArray, aiResult) {
+  if (!dataArray || dataArray.length === 0) return;
+  
+  // Create title based on filenames
+  const fileNames = dataArray.map(d => d.filename || 'Unknown').join(', ');
+  const title = dataArray.length > 1 ? `${dataArray.length} Files: ${fileNames.substring(0, 30)}...` : fileNames;
+  
+  // Extract primary bugcheck if available
+  let mainBugcheck = 'Unknown';
+  if (dataArray[0].crash_summary?.bugcheck_code) {
+    const code = dataArray[0].crash_summary.bugcheck_code.toString(16).toUpperCase();
+    mainBugcheck = `0x${code} (${dataArray[0].crash_summary.bugcheck_name || ''})`;
+  }
+
+  const historyItem = {
+    id: Date.now().toString(),
+    date: new Date().toLocaleString(),
+    title: title,
+    bugcheck: mainBugcheck,
+    dataArray: dataArray,
+    aiResult: aiResult
+  };
+
+  // Prevent exact duplicates (by comparing filenames and time roughly)
+  const isDuplicate = analysisHistory.some(h => 
+    h.title === title && (Date.now() - parseInt(h.id) < 60000) // Within 1 min
+  );
+
+  if (!isDuplicate) {
+    analysisHistory.unshift(historyItem);
+    // Keep only last 50 items to prevent local storage quota issues
+    if (analysisHistory.length > 50) {
+      analysisHistory.pop();
+    }
+    
+    try {
+      localStorage.setItem('bsod_analyzer_history', JSON.stringify(analysisHistory));
+    } catch (e) {
+      console.warn('Could not save to localStorage (quota exceeded?)', e);
+      // Remove AI markdown from old items to save space and try again
+      if (analysisHistory.length > 10) {
+         analysisHistory = analysisHistory.slice(0, 10);
+         localStorage.setItem('bsod_analyzer_history', JSON.stringify(analysisHistory));
+      }
+    }
+    
+    if (document.getElementById('historySidebar').classList.contains('open')) {
+      renderHistoryList();
+    }
+  }
+}
+
+function renderHistoryList() {
+  const container = document.getElementById('historyList');
+  const query = document.getElementById('historySearch').value.toLowerCase();
+  
+  if (analysisHistory.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-secondary);padding:20px;text-align:center;">No history found.<br><small>Your analyses will appear here.</small></div>';
+    return;
+  }
+
+  const filtered = analysisHistory.filter(h => 
+    h.title.toLowerCase().includes(query) || 
+    h.bugcheck.toLowerCase().includes(query) ||
+    h.date.toLowerCase().includes(query)
+  );
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<div style="color:var(--text-secondary);padding:20px;text-align:center;">No matching results.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(h => `
+    <div class="history-item" onclick="loadHistoryItem('${h.id}')">
+      <div class="history-item-title" title="${h.title}">${h.title}</div>
+      <div class="history-item-date">${h.date}</div>
+      <div class="history-item-desc">${h.bugcheck}</div>
+      <button class="history-item-delete" onclick="deleteHistoryItem(event, '${h.id}')">Delete</button>
+    </div>
+  `).join('');
+}
+
+function loadHistoryItem(id) {
+  const item = analysisHistory.find(h => h.id === id);
+  if (!item) return;
+
+  // Close sidebar
+  toggleHistory();
+  
+  // Go to analyzer page
+  showPage('analyzer');
+  
+  // Load data
+  multipleResults = item.dataArray;
+  currentAnalysis = item.dataArray[0];
+  currentAIDiagnosis = item.aiResult;
+  
+  // Update UI state
+  showProgress();
+  ['upload','parse','bugcheck','modules','report'].forEach(s => setStep(s, 'done'));
+  setProgress(100, 'Loaded from history');
+  
+  // Render base results
+  renderResults(item.dataArray);
+  
+  // Overwrite AI Loading with saved AI result immediately
+  if (item.aiResult) {
+    renderAIResult(item.aiResult);
+  }
+  
+  setTimeout(() => {
+    document.getElementById('progressContainer').classList.remove('visible');
+    document.getElementById('resultsSection').classList.add('visible');
+  }, 400);
+  
+  showToast('Loaded analysis from history', 'success');
+}
+
+function deleteHistoryItem(event, id) {
+  event.stopPropagation(); // Prevent loading the item
+  
+  if (confirm('Are you sure you want to delete this history record?')) {
+    analysisHistory = analysisHistory.filter(h => h.id !== id);
+    localStorage.setItem('bsod_analyzer_history', JSON.stringify(analysisHistory));
+    renderHistoryList();
+    showToast('History record deleted');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════
