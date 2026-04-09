@@ -1369,17 +1369,17 @@ async function runAIDiagnosis(dataArray) {
       setTimeout(() => reject(new Error('AI API 응답 시간 초과 (120초). 잠시 후 다시 시도해 주세요.')), 120000)
     );
     
-    // 단일 모델 요청 (Qwen 3.6 Plus Preview)
-    let qwenPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus' }).catch(err => {
-      console.warn("Qwen model failed:", err);
+    // 단일 모델 요청 (Puter 기본 모델)
+    let defaultPromise = puter.ai.chat(messages).catch(err => {
+      console.warn("Default AI model failed:", err);
       return null;
     });
 
     // 응답 대기 (타임아웃 적용)
-    let qwenResponse = null;
+    let aiResponse = null;
     try {
-      qwenResponse = await Promise.race([
-        qwenPromise, 
+      aiResponse = await Promise.race([
+        defaultPromise, 
         timeoutPromise
       ]);
     } catch(err) {
@@ -1387,15 +1387,15 @@ async function runAIDiagnosis(dataArray) {
       throw err;
     }
     
-    // 만약 실패했다면 최후의 보루로 다시 시도
-    if (!qwenResponse) {
-      console.warn("Qwen model failed. Attempting final fallback...");
-      document.getElementById('aiLoadingMsg').textContent = 'Retrying with default AI model...';
-      const finalFallbackPromise = puter.ai.chat(messages, { model: 'openai/gpt-5.4-nano' }).catch(err => {
+    // 만약 실패했다면 한 번 더 재시도
+    if (!aiResponse) {
+      console.warn("AI model failed. Attempting final fallback...");
+      document.getElementById('aiLoadingMsg').textContent = 'Retrying with AI model...';
+      const finalFallbackPromise = puter.ai.chat(messages).catch(err => {
         console.error("Final fallback model also failed:", err);
         return null;
       });
-      qwenResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
+      aiResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
     }
 
     clearInterval(interval);
@@ -1410,7 +1410,7 @@ async function runAIDiagnosis(dataArray) {
       return '';
     };
 
-    let finalText = extractText(qwenResponse);
+    let finalText = extractText(aiResponse);
 
     if (!finalText) throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
 
