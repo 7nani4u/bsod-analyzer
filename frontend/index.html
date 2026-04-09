@@ -1371,7 +1371,7 @@ async function runAIDiagnosis(dataArray) {
     
     // 동시에 두 모델 요청
     const geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' });
-    const fallbackPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview' });
+    const fallbackPromise = puter.ai.chat(messages, { model: 'anthropic/claude-sonnet-4-5' });
 
     // Promise.all로 두 응답 대기 (하나라도 실패하면 fallback 처리됨)
     let geminiResponse, fallbackResponse;
