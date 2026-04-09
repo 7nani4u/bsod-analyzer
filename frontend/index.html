@@ -1371,25 +1371,34 @@ async function runAIDiagnosis(dataArray) {
     
     // 동시에 두 모델 요청
     const geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' });
-    const claudePromise = puter.ai.chat(messages, { model: 'anthropic/claude-sonnet-4-6' });
+    
+    // anthropic/claude-sonnet-4-6 은 puter에서 유료 모델일 가능성이 높아 잔액 부족 에러를 발생시킴.
+    // 따라서 무료/기본 지원 모델인 qwen/qwen3.6-plus-preview:free 등으로 대체하여 다중 모델 앙상블을 유지함
+    const fallbackPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview:free' });
 
     // Promise.all로 두 응답 대기 (하나라도 실패하면 fallback 처리됨)
-    let geminiResponse, claudeResponse;
+    let geminiResponse, fallbackResponse;
     try {
-      [geminiResponse, claudeResponse] = await Promise.race([
-        Promise.all([geminiPromise, claudePromise]), 
+      [geminiResponse, fallbackResponse] = await Promise.race([
+        Promise.all([geminiPromise, fallbackPromise]), 
         timeoutPromise
       ]);
     } catch(err) {
-      // 만약 둘 중 하나가 실패하더라도 성공한 결과만 사용할 수 있도록 처리 (옵션)
-      // 여기서는 타임아웃이 나거나 하나라도 완전 실패 시 에러로 처리
-      throw err;
+      // 만약 둘 중 하나가 실패하더라도 성공한 결과만 사용할 수 있도록 에러 캐치 후 단일 응답만 반환하도록 조정
+      console.warn("One or more AI models failed, attempting to use Gemini solely if available", err);
+      try {
+        geminiResponse = await geminiPromise; // fallback to single model if ensemble fails
+        fallbackResponse = "";
+      } catch (innerErr) {
+        throw innerErr; // if gemini also fails, throw error
+      }
     }
     
     clearInterval(interval);
 
     // 응답 추출 헬퍼 함수
     const extractText = (resp) => {
+      if (!resp) return '';
       if (typeof resp === 'string') return resp;
       if (resp?.message?.content) return typeof resp.message.content === 'string' ? resp.message.content : resp.message.content?.[0]?.text || '';
       if (resp?.content) return typeof resp.content === 'string' ? resp.content : resp.content?.[0]?.text || '';
@@ -1398,30 +1407,38 @@ async function runAIDiagnosis(dataArray) {
     };
 
     const geminiText = extractText(geminiResponse);
-    const claudeText = extractText(claudeResponse);
+    const fallbackText = extractText(fallbackResponse);
 
-    if (!geminiText && !claudeText) throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
+    if (!geminiText && !fallbackText) throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
 
-    // 두 AI의 분석 결과를 통합하는 두 번째 프롬프트 요청 (Gemini 사용)
-    document.getElementById('aiLoadingMsg').textContent = 'Merging multi-model insights...';
-    
-    const mergePrompt = `당신은 수석 시스템 엔지니어입니다. 아래는 동일한 시스템 로그에 대한 두 가지 AI(Gemini와 Claude)의 분석 보고서입니다. 
+    let finalText = "";
+
+    if (geminiText && fallbackText) {
+      // 두 AI의 분석 결과를 통합하는 두 번째 프롬프트 요청 (Gemini 사용)
+      document.getElementById('aiLoadingMsg').textContent = 'Merging multi-model insights...';
+      
+      const mergePrompt = `당신은 수석 시스템 엔지니어입니다. 아래는 동일한 시스템 로그에 대한 두 가지 AI의 분석 보고서입니다. 
 두 보고서의 인사이트를 종합하고 검증하여, 중복된 내용은 하나로 합치고, 각 모델이 찾아낸 고유한 관점과 해결책을 모두 포함하는 하나의 최종 "AI Comprehensive Analysis Report"를 작성해주세요.
 출력 형식은 앞서 요구했던 구조(1. 종합 로그 개요, 2. 주요 오류 식별, 3. 오류 분석, 4. 문제 해결 방안, 5. 추가 분석 권고)를 동일하게 유지하세요.
 
-[Gemini 분석 결과]
+[AI 모델 1 분석 결과]
 ${geminiText}
 
-[Claude 분석 결과]
-${claudeText}`;
+[AI 모델 2 분석 결과]
+${fallbackText}`;
 
-    const finalAiPromise = puter.ai.chat(mergePrompt, { model: 'google/gemini-3.1-pro-preview' });
-    const finalResponse = await Promise.race([finalAiPromise, new Promise((_, r) => setTimeout(() => r(new Error('AI 병합 시간 초과')), 60000))]);
+      try {
+        const finalAiPromise = puter.ai.chat(mergePrompt, { model: 'google/gemini-3.1-pro-preview' });
+        const finalResponse = await Promise.race([finalAiPromise, new Promise((_, r) => setTimeout(() => r(new Error('AI 병합 시간 초과')), 60000))]);
+        finalText = extractText(finalResponse);
+      } catch(mergeErr) {
+        console.warn("Merging failed, using primary model result", mergeErr);
+      }
+    }
     
-    let finalText = extractText(finalResponse);
     if (!finalText) {
-      // 병합 실패 시 Gemini 결과로 폴백
-      finalText = geminiText || claudeText;
+      // 병합 실패 또는 단일 모델만 성공 시
+      finalText = geminiText || fallbackText;
     }
 
     currentAIDiagnosis = { markdown_report: finalText };
