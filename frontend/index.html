@@ -1371,10 +1371,7 @@ async function runAIDiagnosis(dataArray) {
     
     // 동시에 두 모델 요청
     const geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' });
-    
-    // anthropic/claude-sonnet-4-6 은 puter에서 유료 모델일 가능성이 높아 잔액 부족 에러를 발생시킴.
-    // 따라서 무료/기본 지원 모델인 qwen/qwen3.6-plus-preview:free 등으로 대체하여 다중 모델 앙상블을 유지함
-    const fallbackPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview:free' });
+    const fallbackPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview' });
 
     // Promise.all로 두 응답 대기 (하나라도 실패하면 fallback 처리됨)
     let geminiResponse, fallbackResponse;
