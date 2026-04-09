@@ -963,13 +963,45 @@ function renderHeuristicInsights(data) {
   // Empty or simple fallback, since we rely mostly on AI report now
 }
 
-function renderResults(data) {
-  const crash = data.crash_summary || {};
-  const sys = data.system_info || {};
+function processDynamicAnalysisResults(data) {
+  const container = document.querySelector('.dashboard-grid');
+  container.innerHTML = ''; // Clear existing static cards
 
-  // Top Section
-  let bucket = data.failure_bucket || "Unknown";
-  if (bucket === "Unknown") {
+  const sections = {
+    '📄 Log Meta Info': {},
+    '⚙️ System State': {},
+    '🚨 Errors': {},
+    '📈 Performance Metrics': {},
+    '🔍 Debug Insights': {}
+  };
+
+  // Helper to safely add to a section
+  const addInfo = (section, label, value) => {
+    if (value !== undefined && value !== null && value !== 'Unknown' && value !== 'N/A' && value !== '') {
+      // Avoid duplication
+      if (!sections[section]) sections[section] = {};
+      sections[section][label] = value;
+    }
+  };
+
+  // 1. Extract known structured fields first
+  addInfo('📄 Log Meta Info', 'Log Type', data.log_type);
+  addInfo('📄 Log Meta Info', 'Target Process', data.target_process || data.faulting_process);
+  addInfo('📄 Log Meta Info', 'Analysis Mode', data.analysis_mode);
+  addInfo('📄 Log Meta Info', 'File Name', data.filename);
+  addInfo('📄 Log Meta Info', 'Architecture', data.architecture);
+  if (data.system_info) {
+    addInfo('📄 Log Meta Info', 'Timestamp', data.system_info.timestamp);
+    addInfo('⚙️ System State', 'OS Version', data.system_info.os_version);
+    addInfo('⚙️ System State', 'Build Number', data.system_info.build_number);
+    addInfo('⚙️ System State', 'Processor Count', data.system_info.processor_count);
+    addInfo('⚙️ System State', 'System Uptime', data.system_info.system_uptime_sec ? data.system_info.system_uptime_sec + 's' : undefined);
+    addInfo('⚙️ System State', 'Machine Image Type', data.system_info.machine_image_type);
+  }
+
+  const crash = data.crash_summary || {};
+  let bucket = data.failure_bucket;
+  if (!bucket || bucket === "Unknown") {
     if (crash.bugcheck_name && crash.caused_by_driver) {
       const driverName = crash.caused_by_driver.split('.')[0].toUpperCase();
       bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${driverName}!Unknown`;
@@ -977,10 +1009,97 @@ function renderResults(data) {
       bucket = `0x${(crash.bugcheck_code || 0).toString(16).toUpperCase()}_${crash.bugcheck_name}`;
     }
   }
-  document.getElementById('valFailureBucket').innerText = bucket;
+  
+  if (bucket && bucket !== "Unknown") addInfo('🚨 Errors', 'Failure Bucket', bucket);
+  if (crash.bugcheck_code) addInfo('🚨 Errors', 'Bugcheck Code', `0x${crash.bugcheck_code.toString(16).toUpperCase()} (${crash.bugcheck_name})`);
+  if (crash.caused_by_driver) addInfo('🚨 Errors', 'Caused By Driver', crash.caused_by_driver);
+  if (data.exception?.code) addInfo('🚨 Errors', 'Exception Code', `0x${data.exception.code.toString(16).toUpperCase()}`);
+  
+  addInfo('🔍 Debug Insights', 'Stack Core', data.stack_core);
+  addInfo('🔍 Debug Insights', 'Third Party Intervention', data.third_party_intervention);
+  addInfo('🔍 Debug Insights', 'Faulting Thread', data.faulting_thread);
+  
+  if (data.analysis_time) addInfo('📈 Performance Metrics', 'Analysis Time', `${data.analysis_time}s`);
+  if (data.file_size) addInfo('📈 Performance Metrics', 'File Size', formatBytes(data.file_size));
 
-  document.getElementById('metaTargetProcess').innerText = data.target_process || data.faulting_process || 'N/A';
-  document.getElementById('metaLogType').innerText = data.log_type || 'N/A';
+  // 2. Intelligent filtering & Dynamic Classification for arbitrary remaining fields
+  // This allows the UI to handle future JSON keys dynamically
+  const classifyAndAssign = (key, val) => {
+    if (typeof val === 'object' || Array.isArray(val)) return; // Skip complex objects
+    
+    const k = key.toLowerCase();
+    
+    // Discard irrelevant or noisy data
+    if (k.includes('raw') || k.includes('windbg_output') || k.includes('dump_') || k.includes('warnings')) return;
+
+    // Format key to Label
+    const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    // Classification Rules
+    if (k.match(/time|date|session|user|request|source|id|meta/)) {
+      addInfo('📄 Log Meta Info', label, val);
+    } else if (k.match(/cpu|memory|ram|health|env|status|flag|state|usage|load/)) {
+      addInfo('⚙️ System State', label, val);
+    } else if (k.match(/error|fail|exception|stack|trace|crash|bug|fault/)) {
+      addInfo('� Errors', label, val);
+    } else if (k.match(/latency|throughput|response|perf|speed|rate|duration/)) {
+      addInfo('📈 Performance Metrics', label, val);
+    } else if (k.match(/debug|insight|internal|intermediate|var|val|state/)) {
+      addInfo('🔍 Debug Insights', label, val);
+    } else {
+      // Auto-create new section if unclassified but relevant
+      if (!sections['🧩 Other Data']) sections['🧩 Other Data'] = {};
+      addInfo('🧩 Other Data', label, val);
+    }
+  };
+
+  // Iterate top-level keys to auto-classify
+  Object.entries(data).forEach(([key, val]) => {
+    // Skip already processed known keys
+    const skipKeys = ['log_type', 'target_process', 'faulting_process', 'analysis_mode', 'filename', 'architecture', 'system_info', 'crash_summary', 'failure_bucket', 'exception', 'stack_core', 'third_party_intervention', 'faulting_thread', 'analysis_time', 'file_size', 'loaded_modules', 'threads'];
+    if (!skipKeys.includes(key)) {
+      classifyAndAssign(key, val);
+    }
+  });
+
+  // Render cards
+  Object.entries(sections).forEach(([title, items]) => {
+    if (!items || Object.keys(items).length === 0) return; // Skip empty sections
+
+    const card = document.createElement('div');
+    card.className = 'dash-card';
+    
+    const h3 = document.createElement('h3');
+    h3.textContent = title;
+    card.appendChild(h3);
+
+    Object.entries(items).forEach(([label, value]) => {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'dash-item';
+      
+      const labelDiv = document.createElement('div');
+      labelDiv.className = 'dash-label';
+      labelDiv.textContent = label;
+      
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'dash-value';
+      valueDiv.textContent = value;
+      
+      itemDiv.appendChild(labelDiv);
+      itemDiv.appendChild(valueDiv);
+      card.appendChild(itemDiv);
+    });
+
+    container.appendChild(card);
+  });
+}
+
+function renderResults(data) {
+  const crash = data.crash_summary || {};
+  const sys = data.system_info || {};
+
+  // Build dynamic dashboard sections based on classification rules
+  processDynamicAnalysisResults(data);
 
   document.getElementById('valWindbgOutput').innerText = data.windbg_output || 'No raw output available.';
   
