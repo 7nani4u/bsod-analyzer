@@ -1370,12 +1370,12 @@ async function runAIDiagnosis(dataArray) {
     );
     
     // 동시에 두 모델 요청하되 개별적으로 에러를 catch하여 한쪽 실패가 전체 실패(Promise.all의 특징)로 이어지지 않게 함
-    const geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' }).catch(err => {
+    let geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' }).catch(err => {
       console.warn("Gemini model failed:", err);
       return null;
     });
-    const fallbackPromise = puter.ai.chat(messages, { model: 'x-ai/grok-4.20' }).catch(err => {
-      console.warn("Grok model failed:", err);
+    let fallbackPromise = puter.ai.chat(messages, { model: 'deepseek/deepseek-r1' }).catch(err => {
+      console.warn("DeepSeek R1 model failed:", err);
       return null;
     });
 
@@ -1392,6 +1392,14 @@ async function runAIDiagnosis(dataArray) {
       throw err;
     }
     
+    // 만약 둘 다 실패했다면 최후의 보루로 기본 모델(모델명 지정 안함, Puter의 디폴트 GPT-4o-mini 등 사용)로 재시도
+    if (!geminiResponse && !fallbackResponse) {
+      console.warn("Both models failed. Attempting final fallback with default model...");
+      document.getElementById('aiLoadingMsg').textContent = 'Retrying with default AI model...';
+      const finalFallbackPromise = puter.ai.chat(messages);
+      geminiResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
+    }
+
     clearInterval(interval);
 
     // 응답 추출 헬퍼 함수
