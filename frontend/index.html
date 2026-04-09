@@ -1396,7 +1396,10 @@ async function runAIDiagnosis(dataArray) {
     if (!geminiResponse && !fallbackResponse) {
       console.warn("Both models failed. Attempting final fallback with default model...");
       document.getElementById('aiLoadingMsg').textContent = 'Retrying with default AI model...';
-      const finalFallbackPromise = puter.ai.chat(messages);
+      const finalFallbackPromise = puter.ai.chat(messages).catch(err => {
+        console.error("Default model also failed:", err);
+        return null;
+      });
       geminiResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
     }
 
