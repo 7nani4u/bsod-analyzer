@@ -709,6 +709,7 @@ let currentAnalysis = null;
 let currentAIDiagnosis = null;
 let allBugchecks = [];
 let bugcheckFilter = 'all';
+let multipleResults = [];
 const API_BASE = window.location.origin;
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -797,10 +798,8 @@ uploadZone.addEventListener('drop', e => {
 function handleFileSelect(e) {
   const files = Array.from(e.target.files);
   if (files.length > 0) processFiles(files);
+  e.target.value = ''; // Reset input to allow selecting the same file again
 }
-
-let multipleResults = [];
-let currentAnalysis = null;
 
 async function processFiles(files) {
   const allowed = ['.txt', '.csv'];
@@ -997,9 +996,9 @@ function renderHeuristicInsights(data) {
   // Empty or simple fallback, since we rely mostly on AI report now
 }
 
-function processDynamicAnalysisResults(data) {
-  const container = document.querySelector('.dashboard-grid');
-  container.innerHTML = ''; // Clear existing static cards
+function processDynamicAnalysisResults(data, container) {
+  // We use the provided container parameter now, so we don't clear the entire grid inside this function
+  // container is passed from renderResults
 
   const sections = {
     '📄 Log Meta Info': {},
