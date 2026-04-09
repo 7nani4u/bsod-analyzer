@@ -542,18 +542,18 @@
     <!-- Upload Zone -->
     <div class="upload-section">
       <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileInput').click()">
-        <div class="upload-icon">�</div>
-        <h3>Drop your log file here</h3>
+        <div class="upload-icon">📄</div>
+        <h3>Drop your log files here</h3>
         <p>Supports Text Logs (.txt) and CSV files</p>
         <button class="btn btn-primary" onclick="event.stopPropagation(); document.getElementById('fileInput').click()">
-          ⬆ Browse File
+          ⬆ Browse Files
         </button>
         <div class="upload-meta" style="margin-top:16px">
           <span>📎 .txt, .csv</span>
           <span>📦 Max 2GB (chunked)</span>
           <span>🔒 Processed locally</span>
         </div>
-        <input type="file" id="fileInput" accept=".txt,.csv" onchange="handleFileSelect(event)" />
+        <input type="file" id="fileInput" accept=".txt,.csv" multiple onchange="handleFileSelect(event)" />
       </div>
 
       <!-- Progress -->
@@ -780,35 +780,58 @@ uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.cl
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
 uploadZone.addEventListener('drop', e => {
   e.preventDefault(); uploadZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if (file) processFile(file);
+  const files = Array.from(e.dataTransfer.files);
+  if (files.length > 0) processFiles(files);
 });
 
 function handleFileSelect(e) {
-  const file = e.target.files[0];
-  if (file) processFile(file);
+  const files = Array.from(e.target.files);
+  if (files.length > 0) processFiles(files);
 }
 
-async function processFile(file) {
+let multipleResults = [];
+
+async function processFiles(files) {
   const allowed = ['.txt', '.csv'];
-  const ext = '.' + file.name.split('.').pop().toLowerCase();
-  if (!allowed.includes(ext)) { showToast('Invalid file type. Use .txt or .csv', 'error'); return; }
-  if (file.size > 2 * 1024 * 1024 * 1024) { showToast('File exceeds 2GB limit', 'error'); return; }
+  
+  // Validate all files first
+  for (let file of files) {
+    const ext = '.' + file.name.split('.').pop().toLowerCase();
+    if (!allowed.includes(ext)) { 
+      showToast(`Invalid file type for ${file.name}. Use .txt or .csv`, 'error'); 
+      return; 
+    }
+    if (file.size > 2 * 1024 * 1024 * 1024) { 
+      showToast(`${file.name} exceeds 2GB limit`, 'error'); 
+      return; 
+    }
+  }
 
   showProgress();
   setStep('upload', 'active');
+  multipleResults = []; // Reset results array
 
   try {
-    let analysisResult;
-    if (file.size <= 4 * 1024 * 1024) {
-      // Direct upload for files ≤ 4MB
-      analysisResult = await directUpload(file);
-    } else {
-      // Chunked upload for large files
-      analysisResult = await chunkedUpload(file);
+    for (let i = 0; i < files.length; i++) {
+      let file = files[i];
+      setProgress(5, `Uploading file ${i + 1} of ${files.length}: ${file.name}...`);
+      
+      let analysisResult;
+      if (file.size <= 4 * 1024 * 1024) {
+        analysisResult = await directUpload(file);
+      } else {
+        analysisResult = await chunkedUpload(file);
+      }
+      
+      multipleResults.push(analysisResult);
     }
-    currentAnalysis = analysisResult;
-    renderResults(analysisResult);
+    
+    // Process the first file's result or an aggregated view
+    currentAnalysis = multipleResults[0]; // Currently just showing the first file's AI result, but we can extend this
+    
+    // We will need to adapt renderResults for multiple files, or render them sequentially
+    renderResults(multipleResults); 
+    
     setStep('report', 'done');
     setProgress(100, 'Analysis complete!');
     setTimeout(() => {
@@ -1012,7 +1035,14 @@ function processDynamicAnalysisResults(data) {
   }
   
   if (bucket && bucket !== "Unknown") addInfo('🚨 Errors', 'Failure Bucket', bucket);
-  if (crash.bugcheck_code) addInfo('🚨 Errors', 'Bugcheck Code', `0x${crash.bugcheck_code.toString(16).toUpperCase()} (${crash.bugcheck_name})`);
+  
+  if (crash.bugcheck_code !== undefined && crash.bugcheck_code !== null) {
+    const hexCode = crash.bugcheck_code.toString(16).toUpperCase().padStart(8, '0');
+    const name = crash.bugcheck_name || "Unknown BugCheck";
+    // Always attach the MS Learn link regardless of the code value
+    addInfo('🚨 Errors', 'Bugcheck Code', `<a href="https://learn.microsoft.com/ko-kr/windows-hardware/drivers/debugger/bug-check-code-reference2" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">0x${hexCode} (${name})</a>`);
+  }
+  
   if (crash.caused_by_driver) addInfo('🚨 Errors', 'Caused By Driver', crash.caused_by_driver);
   if (data.exception?.code) addInfo('🚨 Errors', 'Exception Code', `0x${data.exception.code.toString(16).toUpperCase()}`);
   
@@ -1020,8 +1050,15 @@ function processDynamicAnalysisResults(data) {
   addInfo('🔍 Debug Insights', 'Third Party Intervention', data.third_party_intervention);
   addInfo('🔍 Debug Insights', 'Faulting Thread', data.faulting_thread);
   
-  if (data.analysis_time) addInfo('📈 Performance Metrics', 'Analysis Time', `${data.analysis_time}s`);
-  if (data.file_size) addInfo('📈 Performance Metrics', 'File Size', formatBytes(data.file_size));
+  // 5. Dynamic Section: Performance Metrics
+  if (data.analysis_time) {
+    if (!sections['📈 Performance Metrics']) sections['📈 Performance Metrics'] = {};
+    sections['📈 Performance Metrics']['Analysis Time'] = `${data.analysis_time}s`;
+  }
+  if (data.file_size) {
+    if (!sections['📈 Performance Metrics']) sections['📈 Performance Metrics'] = {};
+    sections['📈 Performance Metrics']['File Size'] = formatBytes(data.file_size);
+  }
 
   // 2. Intelligent filtering & Dynamic Classification for arbitrary remaining fields
   // This allows the UI to handle future JSON keys dynamically
@@ -1042,7 +1079,7 @@ function processDynamicAnalysisResults(data) {
     } else if (k.match(/cpu|memory|ram|health|env|status|flag|state|usage|load/)) {
       addInfo('⚙️ System State', label, val);
     } else if (k.match(/error|fail|exception|stack|trace|crash|bug|fault/)) {
-      addInfo('� Errors', label, val);
+      addInfo('🚨 Errors', label, val);
     } else if (k.match(/latency|throughput|response|perf|speed|rate|duration/)) {
       addInfo('📈 Performance Metrics', label, val);
     } else if (k.match(/debug|insight|internal|intermediate|var|val|state/)) {
@@ -1061,7 +1098,7 @@ function processDynamicAnalysisResults(data) {
 
   // Render cards
   Object.entries(sections).forEach(([title, items]) => {
-    if (!items || Object.keys(items).length === 0) return; // Skip empty sections
+    if (Object.keys(items).length === 0) return; // Skip empty sections
 
     const card = document.createElement('div');
     card.className = 'dash-card';
@@ -1080,7 +1117,12 @@ function processDynamicAnalysisResults(data) {
       
       const valueDiv = document.createElement('div');
       valueDiv.className = 'dash-value';
-      valueDiv.textContent = value;
+      // Use innerHTML instead of textContent if the value contains an anchor tag
+      if (typeof value === 'string' && value.includes('<a href=')) {
+        valueDiv.innerHTML = value;
+      } else {
+        valueDiv.textContent = value;
+      }
       
       itemDiv.appendChild(labelDiv);
       itemDiv.appendChild(valueDiv);
@@ -1091,12 +1133,36 @@ function processDynamicAnalysisResults(data) {
   });
 }
 
-function renderResults(data) {
-  const crash = data.crash_summary || {};
-  const sys = data.system_info || {};
+function renderResults(dataArray) {
+  // Clear any previous results
+  const dashboardContainer = document.querySelector('.dashboard-grid');
+  dashboardContainer.innerHTML = '';
+  
+  const windbgContainer = document.getElementById('valWindbgOutput');
+  windbgContainer.innerText = '';
+  
+  if (!Array.isArray(dataArray)) {
+    dataArray = [dataArray];
+  }
 
-  // Build dynamic dashboard sections based on classification rules
-  processDynamicAnalysisResults(data);
+  dataArray.forEach((data, index) => {
+    // Add file header
+    const fileHeader = document.createElement('h2');
+    fileHeader.style.gridColumn = '1 / -1';
+    fileHeader.style.color = 'var(--accent-blue)';
+    fileHeader.style.borderBottom = '1px solid var(--border)';
+    fileHeader.style.paddingBottom = '8px';
+    fileHeader.style.marginTop = index > 0 ? '32px' : '0';
+    fileHeader.textContent = `📁 File: ${data.filename || `File ${index + 1}`}`;
+    dashboardContainer.appendChild(fileHeader);
+    
+    processDynamicAnalysisResults(data, dashboardContainer);
+
+    windbgContainer.innerText += `\n--- ${data.filename || `File ${index + 1}`} ---\n`;
+    windbgContainer.innerText += data.windbg_output || 'No raw output available.\n';
+    
+    renderHeuristicInsights(data);
+  });
 
   // AI Output Section
   const aiResultCard = document.getElementById('aiResultCard');
@@ -1104,12 +1170,18 @@ function renderResults(data) {
   // It is independently rendered inside runAIDiagnosis.
   aiResultCard.style.display = 'none';
 
-  // Render heuristic insights immediately so the requested sections are available even without AI.
-  renderHeuristicInsights(data);
-
-  // Auto-start AI Diagnosis
-  runAIDiagnosis();
+  // Pass the aggregated array to AI Diagnosis if needed, or process them one by one
+  runAIDiagnosis(dataArray);
 }
+
+function processDynamicAnalysisResults(data, container) {
+  const sections = {
+    '📄 Log Meta Info': {},
+    '⚙️ System State': {},
+    '🚨 Errors': {},
+    '📈 Performance Metrics': {},
+    '🔍 Debug Insights': {}
+  };
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
@@ -1121,8 +1193,8 @@ function formatBytes(bytes) {
 // ═══════════════════════════════════════════════════════════════════════
 // AI Diagnosis
 // ═══════════════════════════════════════════════════════════════════════
-async function runAIDiagnosis() {
-  if (!currentAnalysis) { showToast('No analysis loaded', 'error'); return; }
+async function runAIDiagnosis(dataArray) {
+  if (!dataArray || dataArray.length === 0) { showToast('No analysis loaded', 'error'); return; }
   document.getElementById('aiLoading').style.display = 'flex';
   document.getElementById('finalAnalysisContent').style.display = 'none';
 
@@ -1133,17 +1205,33 @@ async function runAIDiagnosis() {
   }, 3000);
 
   try {
-    // Build structured prompt for Puter.js (free, no API key)
-    const crash = currentAnalysis.crash_summary || {};
-    const sysInfo = currentAnalysis.system_info || {};
-    const modules = (currentAnalysis.loaded_modules || []).slice(0, 10);
-    const diagnosis = currentAnalysis.diagnosis || {};
+    // Combine logs if multiple files
+    let combinedRawLog = '';
+    let combinedModuleList = '';
+    let combinedSystemInfo = '';
+    
+    dataArray.forEach((data, index) => {
+      const sysInfo = data.system_info || {};
+      const modules = (data.loaded_modules || []).slice(0, 10);
+      
+      const rawLog = (data.windbg_output || data.raw_log || '').substring(0, 8000);
+      const moduleList = modules.map(m => m.name).filter(Boolean).join(', ') || '(없음)';
+      
+      combinedSystemInfo += `\n[File ${index + 1}: ${data.filename || 'Unknown'}]\n`;
+      combinedSystemInfo += `- Target Process: ${data.target_process || data.faulting_process || 'Unknown'}\n`;
+      combinedSystemInfo += `- OS Version: ${sysInfo.os_version || 'Unknown'}\n`;
+      combinedSystemInfo += `- Architecture: ${data.architecture || 'Unknown'}\n`;
+      combinedSystemInfo += `- Log Type: ${data.log_type || 'Unknown'}\n`;
+      
+      combinedRawLog += `\n--- File ${index + 1}: ${data.filename || 'Unknown'} ---\n${rawLog || '(로그 내용 없음)'}\n`;
+      combinedModuleList += `\n--- File ${index + 1}: ${data.filename || 'Unknown'} ---\n${moduleList}\n`;
+    });
 
     const systemPrompt = `당신은 로그 분석 전문가입니다. 첨부된 로그 파일을 기반으로 문제의 근본 원인을 식별하고, 실행 가능한 해결 방안과 재발 방지 대책을 제시해야 합니다.
-분석 보고서는 아래의 구조에 맞춰 기술적으로 명확하고 실현 가능한 내용을 중심으로 작성해 주세요.
+분석 보고서는 아래의 구조에 맞춰 기술적으로 명확하고 실현 가능한 내용을 중심으로 작성해 주세요. 여러 파일이 제공된 경우 파일들 간의 연관성을 파악하여 종합적으로 분석하세요.
 
-🔍 1. 로그 개요
-분석 대상 로그에 대해 다음 정보를 간결하게 설명하세요.
+🔍 1. 종합 로그 개요
+분석 대상 로그들에 대해 다음 정보를 간결하게 설명하세요.
 - 로그 출처 (시스템/애플리케이션/장비 등)
 - 로그 수집 시간 범위
 - 로그 유형 (예: application log, system log, security log 등)
@@ -1151,7 +1239,7 @@ async function runAIDiagnosis() {
 - 분석 목적 요약
 
 ⚠️ 2. 주요 오류 식별
-로그에서 탐지된 주요 오류 메시지를 타임스탬프와 함께 목록화하세요.
+로그에서 탐지된 주요 오류 메시지를 파일별/타임스탬프와 함께 목록화하세요.
 
 🧠 3. 오류 분석
 
@@ -1180,6 +1268,7 @@ async function runAIDiagnosis() {
 예: 설정 변경, 명령어, 패치 적용, 구성 수정 등
 가능한 경우 조치의 우선순위를 제안하세요.
 필요 시 시스템 환경에 따라 고려해야 할 대체 조치도 함께 기술하세요.
+분석 대상에 Bugcheck Code(오류 검사 코드)가 포함된 경우, 다음 링크(https://learn.microsoft.com/ko-kr/windows-hardware/drivers/debugger/bug-check-code-reference2)를 참고하여 해당 코드에 맞는 해결 방법을 제안하세요.
 
 🔬 5. 추가 분석 권고
 현재 로그 분석만으로는 확인이 어려운 영역을 식별하고 다음을 제안하세요.
@@ -1196,23 +1285,13 @@ async function runAIDiagnosis() {
 - 추측보다는 로그 기반 분석을 우선
 - 고객사 전달용 이메일 초안은 절대 포함하지 마세요.`;
 
-    // 로그 원문 최대 8000자 전달 (txt/csv 모두 windbg_output 또는 raw_log 필드에 저장됨)
-    const rawLog = (currentAnalysis.windbg_output || currentAnalysis.raw_log || '').substring(0, 8000);
-    const moduleList = modules.map(m => m.name).filter(Boolean).join(', ') || '(없음)';
+    const userPrompt = `다음 로그 데이터를 종합적으로 분석하여 보고서를 작성해주세요.
 
-    const userPrompt = `다음 로그 데이터를 분석하여 보고서를 작성해주세요.
+[시스템 기본 정보]${combinedSystemInfo}
 
-[시스템 기본 정보]
-- Target Process: ${currentAnalysis.target_process || currentAnalysis.faulting_process || 'Unknown'}
-- OS Version: ${sysInfo.os_version || 'Unknown'}
-- Architecture: ${currentAnalysis.architecture || 'Unknown'}
-- Log Type: ${currentAnalysis.log_type || 'Unknown'}
+[원본 로그 내용]${combinedRawLog}
 
-[원본 로그 내용]
-${rawLog || '(로그 내용 없음)'}
-
-[관련 모듈 / 컴포넌트]
-${moduleList}`;
+[관련 모듈 / 컴포넌트]${combinedModuleList}`;
 
     // Puter.js messages 배열 형식으로 호출 (system/user 역할 분리)
     const messages = [
@@ -1505,8 +1584,14 @@ async function generateEmail() {
   document.getElementById('emailPreviewSection').style.display = 'none';
 
   try {
-    const crash = currentAnalysis.crash_summary || {};
-    const sysInfo = currentAnalysis.system_info || {};
+    let filesSummary = '';
+    multipleResults.forEach((analysis, idx) => {
+      const sysInfo = analysis.system_info || {};
+      filesSummary += `\n[File ${idx + 1}: ${analysis.filename || 'log.txt'}]
+- OS: ${sysInfo.os_version || 'Unknown'}
+- Target Process: ${analysis.target_process || 'Unknown'}`;
+    });
+
     const ai = currentAIDiagnosis || {};
     const lang = document.getElementById('emailLang').value;
     const tone = document.getElementById('emailTone').value;
@@ -1528,10 +1613,8 @@ Rules:
 
     const userPrompt = `다음 분석 정보를 바탕으로 전달용 이메일을 작성해주세요:
 
-사고 정보:
-- 파일: ${currentAnalysis.filename || 'log.txt'}
-- OS: ${sysInfo.os_version || 'Unknown'}
-- Target Process: ${window.currentAnalysis?.target_process || 'Unknown'}
+사고 정보:${filesSummary}
+
 - AI 분석 결과 요약: ${ai.markdown_report ? ai.markdown_report.substring(0, 1500) : '분석 중'}
 
 이메일 구조:
