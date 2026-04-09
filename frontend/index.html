@@ -1370,20 +1370,22 @@ async function runAIDiagnosis(dataArray) {
     );
     
     // 동시에 두 모델 요청하되 개별적으로 에러를 catch하여 한쪽 실패가 전체 실패(Promise.all의 특징)로 이어지지 않게 함
-    let geminiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' }).catch(err => {
-      console.warn("Gemini model failed:", err);
+    // 모델1: ChatGPT 기본 모델 (Puter의 디폴트 라우팅 모델을 사용하기 위해 model 파라미터 생략)
+    let chatgptPromise = puter.ai.chat(messages).catch(err => {
+      console.warn("ChatGPT (Default) model failed:", err);
       return null;
     });
-    let fallbackPromise = puter.ai.chat(messages, { model: 'openai/gpt-5.4-nano' }).catch(err => {
-      console.warn("GPT-5.4 Nano model failed:", err);
+    // 모델2: Qwen 3.6 Plus Preview
+    let qwenPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview' }).catch(err => {
+      console.warn("Qwen model failed:", err);
       return null;
     });
 
     // 두 응답 대기 (타임아웃 적용)
-    let geminiResponse = null, fallbackResponse = null;
+    let chatgptResponse = null, qwenResponse = null;
     try {
-      [geminiResponse, fallbackResponse] = await Promise.race([
-        Promise.all([geminiPromise, fallbackPromise]), 
+      [chatgptResponse, qwenResponse] = await Promise.race([
+        Promise.all([chatgptPromise, qwenPromise]), 
         timeoutPromise
       ]);
     } catch(err) {
@@ -1392,15 +1394,15 @@ async function runAIDiagnosis(dataArray) {
       throw err;
     }
     
-    // 만약 둘 다 실패했다면 최후의 보루로 기본 모델(모델명 지정 안함, Puter의 디폴트 GPT-4o-mini 등 사용)로 재시도
-    if (!geminiResponse && !fallbackResponse) {
-      console.warn("Both models failed. Attempting final fallback with default model...");
+    // 만약 둘 다 실패했다면 최후의 보루로 다시 시도
+    if (!chatgptResponse && !qwenResponse) {
+      console.warn("Both models failed. Attempting final fallback...");
       document.getElementById('aiLoadingMsg').textContent = 'Retrying with default AI model...';
       const finalFallbackPromise = puter.ai.chat(messages).catch(err => {
-        console.error("Default model also failed:", err);
+        console.error("Final fallback model also failed:", err);
         return null;
       });
-      geminiResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
+      chatgptResponse = await Promise.race([finalFallbackPromise, timeoutPromise]);
     }
 
     clearInterval(interval);
@@ -1415,15 +1417,15 @@ async function runAIDiagnosis(dataArray) {
       return '';
     };
 
-    const geminiText = extractText(geminiResponse);
-    const fallbackText = extractText(fallbackResponse);
+    const chatgptText = extractText(chatgptResponse);
+    const qwenText = extractText(qwenResponse);
 
-    if (!geminiText && !fallbackText) throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
+    if (!chatgptText && !qwenText) throw new Error('AI 응답이 비어 있습니다. 다시 시도해 주세요.');
 
     let finalText = "";
 
-    if (geminiText && fallbackText) {
-      // 두 AI의 분석 결과를 통합하는 두 번째 프롬프트 요청 (Gemini 사용)
+    if (chatgptText && qwenText) {
+      // 두 AI의 분석 결과를 통합하는 두 번째 프롬프트 요청
       document.getElementById('aiLoadingMsg').textContent = 'Merging multi-model insights...';
       
       const mergePrompt = `당신은 수석 시스템 엔지니어입니다. 아래는 동일한 시스템 로그에 대한 두 가지 AI의 분석 보고서입니다. 
@@ -1431,13 +1433,13 @@ async function runAIDiagnosis(dataArray) {
 출력 형식은 앞서 요구했던 구조(1. 종합 로그 개요, 2. 주요 오류 식별, 3. 오류 분석, 4. 문제 해결 방안, 5. 추가 분석 권고)를 동일하게 유지하세요.
 
 [AI 모델 1 분석 결과]
-${geminiText}
+${chatgptText}
 
 [AI 모델 2 분석 결과]
-${fallbackText}`;
+${qwenText}`;
 
       try {
-        const finalAiPromise = puter.ai.chat(mergePrompt, { model: 'google/gemini-3.1-pro-preview' });
+        const finalAiPromise = puter.ai.chat(mergePrompt); // 병합 시에도 기본 모델 사용
         const finalResponse = await Promise.race([finalAiPromise, new Promise((_, r) => setTimeout(() => r(new Error('AI 병합 시간 초과')), 60000))]);
         finalText = extractText(finalResponse);
       } catch(mergeErr) {
@@ -1447,7 +1449,7 @@ ${fallbackText}`;
     
     if (!finalText) {
       // 병합 실패 또는 단일 모델만 성공 시
-      finalText = geminiText || fallbackText;
+      finalText = chatgptText || qwenText;
     }
 
     currentAIDiagnosis = { markdown_report: finalText };
