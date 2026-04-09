@@ -989,10 +989,11 @@ function processDynamicAnalysisResults(data) {
   addInfo('📄 Log Meta Info', 'Target Process', data.target_process || data.faulting_process);
   addInfo('📄 Log Meta Info', 'Analysis Mode', data.analysis_mode);
   addInfo('📄 Log Meta Info', 'File Name', data.filename);
-  addInfo('📄 Log Meta Info', 'Architecture', data.architecture);
   if (data.system_info) {
     addInfo('📄 Log Meta Info', 'Timestamp', data.system_info.timestamp);
-    addInfo('⚙️ System State', 'OS Version', data.system_info.os_version);
+    if (data.system_info.os_version) {
+      addInfo('⚙️ System State', 'OS Version', data.system_info.os_version);
+    }
     addInfo('⚙️ System State', 'Build Number', data.system_info.build_number);
     addInfo('⚙️ System State', 'Processor Count', data.system_info.processor_count);
     addInfo('⚙️ System State', 'System Uptime', data.system_info.system_uptime_sec ? data.system_info.system_uptime_sec + 's' : undefined);
@@ -1046,10 +1047,6 @@ function processDynamicAnalysisResults(data) {
       addInfo('📈 Performance Metrics', label, val);
     } else if (k.match(/debug|insight|internal|intermediate|var|val|state/)) {
       addInfo('🔍 Debug Insights', label, val);
-    } else {
-      // Auto-create new section if unclassified but relevant
-      if (!sections['🧩 Other Data']) sections['🧩 Other Data'] = {};
-      addInfo('🧩 Other Data', label, val);
     }
   };
 
@@ -1101,8 +1098,12 @@ function renderResults(data) {
   // Build dynamic dashboard sections based on classification rules
   processDynamicAnalysisResults(data);
 
-  document.getElementById('valWindbgOutput').innerText = data.windbg_output || 'No raw output available.';
-  
+  // AI Output Section
+  const aiResultCard = document.getElementById('aiResultCard');
+  // AI report should not embed the exact analysis result cards again.
+  // It is independently rendered inside runAIDiagnosis.
+  aiResultCard.style.display = 'none';
+
   // Render heuristic insights immediately so the requested sections are available even without AI.
   renderHeuristicInsights(data);
 
@@ -1444,13 +1445,14 @@ function buildSectionCard(sec) {
   </div>`;
 }
 
-// ── renderAIResult: 파싱 → 카드 렌더링
+  // ── renderAIResult: 파싱 → 카드 렌더링
 function renderAIResult(ai) {
   document.getElementById('aiLoading').style.display = 'none';
   document.getElementById('finalAnalysisContent').style.display = 'block';
   document.getElementById('aiResultCard').style.display = 'block';
 
   const container = document.getElementById('aiReportContent');
+  container.innerHTML = ''; // Clear previous AI content to prevent duplication
 
   if (!ai.markdown_report) {
     container.innerHTML = `
