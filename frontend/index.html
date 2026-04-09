@@ -1304,7 +1304,7 @@ async function runAIDiagnosis(dataArray) {
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('AI API 응답 시간 초과 (120초). 잠시 후 다시 시도해 주세요.')), 120000)
     );
-    const aiPromise = puter.ai.chat(messages);
+    const aiPromise = puter.ai.chat(messages, { model: 'google/gemini-3.1-pro-preview' });
 
     const response = await Promise.race([aiPromise, timeoutPromise]);
     clearInterval(interval);
@@ -1630,7 +1630,7 @@ Rules:
     
     // 이메일 생성 시에도 무한 로딩 방지
     const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('AI API 응답 시간 초과 (60초)')), 60000));
-    const aiPromise = puter.ai.chat(fullPrompt, { model: 'gpt-5-nano' });
+    const aiPromise = puter.ai.chat(fullPrompt, { model: 'google/gemini-3.1-pro-preview' });
     
     const response = await Promise.race([aiPromise, timeoutPromise]);
     const emailText = typeof response === 'string' ? response : (response?.message?.content || response?.content || '');
