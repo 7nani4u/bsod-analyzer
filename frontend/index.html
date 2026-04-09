@@ -1370,7 +1370,7 @@ async function runAIDiagnosis(dataArray) {
     );
     
     // 단일 모델 요청 (Qwen 3.6 Plus Preview)
-    let qwenPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus-preview' }).catch(err => {
+    let qwenPromise = puter.ai.chat(messages, { model: 'qwen/qwen3.6-plus' }).catch(err => {
       console.warn("Qwen model failed:", err);
       return null;
     });
