@@ -776,10 +776,20 @@ function showToast(msg, type = 'info') {
 // File upload — chunked for large files, direct for small
 // ═══════════════════════════════════════════════════════════════════════
 const uploadZone = document.getElementById('uploadZone');
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('dragover', e => { 
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  uploadZone.classList.add('drag-over'); 
+});
+uploadZone.addEventListener('dragleave', e => { 
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  uploadZone.classList.remove('drag-over'); 
+});
 uploadZone.addEventListener('drop', e => {
-  e.preventDefault(); uploadZone.classList.remove('drag-over');
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  uploadZone.classList.remove('drag-over');
   const files = Array.from(e.dataTransfer.files);
   if (files.length > 0) processFiles(files);
 });
@@ -790,6 +800,7 @@ function handleFileSelect(e) {
 }
 
 let multipleResults = [];
+let currentAnalysis = null;
 
 async function processFiles(files) {
   const allowed = ['.txt', '.csv'];
@@ -1173,15 +1184,6 @@ function renderResults(dataArray) {
   // Pass the aggregated array to AI Diagnosis if needed, or process them one by one
   runAIDiagnosis(dataArray);
 }
-
-function processDynamicAnalysisResults(data, container) {
-  const sections = {
-    '📄 Log Meta Info': {},
-    '⚙️ System State': {},
-    '🚨 Errors': {},
-    '📈 Performance Metrics': {},
-    '🔍 Debug Insights': {}
-  };
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
