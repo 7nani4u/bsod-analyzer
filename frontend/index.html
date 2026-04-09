@@ -1374,8 +1374,8 @@ async function runAIDiagnosis(dataArray) {
       console.warn("Gemini model failed:", err);
       return null;
     });
-    let fallbackPromise = puter.ai.chat(messages, { model: 'openai/gpt-5.4' }).catch(err => {
-      console.warn("GPT-5.4 model failed:", err);
+    let fallbackPromise = puter.ai.chat(messages, { model: 'openai/gpt-5.4-nano' }).catch(err => {
+      console.warn("GPT-5.4 Nano model failed:", err);
       return null;
     });
 
